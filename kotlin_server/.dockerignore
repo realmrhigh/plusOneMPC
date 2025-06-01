@@ -1,0 +1,36 @@
+# Gradle files
+.gradle
+build
+app/build
+gradle/
+gradlew
+gradlew.bat
+
+# IDE files
+.idea
+*.iml
+
+# Local configuration
+.DS_Store
+local.properties
+
+# Logs
+*.log
+
+# Test reports
+app/build/reports
+app/build/test-results
+
+# Other build artifacts
+app/build/tmp
+app/build/classes
+app/build/generated
+app/build/resources
+app/build/libs/*-javadoc.jar
+app/build/libs/*-sources.jar
+!app/build/libs/*-all.jar
+!app/build/libs/*-shadow.jar
+
+# OS specific
+*~
+*.swp
