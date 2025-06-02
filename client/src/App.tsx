@@ -15,6 +15,7 @@ import { Canvas } from "@react-three/fiber";
 import { Suspense } from "react";
 import { useIsMobile } from "@/hooks/use-is-mobile";
 import { Menu, X, Settings, Sliders, Save, Library, Play, Pause, Archive, RefreshCw, Volume2, VolumeX, Scissors, Grid, Database } from 'lucide-react'; // Added Database
+import { Sheet, SheetTrigger, SheetContent, SheetHeader, SheetTitle, SheetClose } from "@/components/ui/sheet";
 import "@fontsource/inter";
 import { Toaster } from 'sonner';
 import ProjectPanel from '@/components/DrumMachine/ProjectPanel';
@@ -39,7 +40,7 @@ function App() {
   
   // State for drawer panels
   const [activePanel, setActivePanel] = useState<string | null>(null);
-  const [showControls, setShowControls] = useState(true);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false); // Renamed from showControls
   
   // Initialize audio on first user interaction
   const initializeAudio = () => {
@@ -153,70 +154,53 @@ function App() {
                 </div>
               </div>
               
-              {/* Floating menu button */}
-              <div className="absolute bottom-20 right-4 z-10">
-                <button 
-                  onClick={() => setShowControls(!showControls)}
-                  className="bg-red-700 hover:bg-red-600 text-white rounded-full p-3 shadow-lg border-2 border-red-600"
-                >
-                  {showControls ? <X size={24} /> : <Menu size={24} />}
-                </button>
-              </div>
-              
-              {/* Control panel buttons */}
-              {showControls && (
-                <div className="absolute top-4 right-4 flex flex-col gap-2 z-10">
-                  <button 
-                    onClick={() => setActivePanel(activePanel === 'transport' ? null : 'transport')}
-                    className={`bg-red-700 hover:bg-red-600 text-white rounded-full p-3 shadow-lg border-2 ${activePanel === 'transport' ? 'border-white' : 'border-red-600'}`}
-                    title="Transport"
-                  >
-                    <Sliders size={24} />
-                  </button>
-                  <button 
-                    onClick={() => setActivePanel(activePanel === 'sequencer' ? null : 'sequencer')}
-                    className={`bg-red-700 hover:bg-red-600 text-white rounded-full p-3 shadow-lg border-2 ${activePanel === 'sequencer' ? 'border-white' : 'border-red-600'}`}
-                    title="Sequencer"
-                  >
-                    <Save size={24} />
-                  </button>
-                  <button 
-                    onClick={() => setActivePanel(activePanel === 'processor' ? null : 'processor')}
-                    className={`bg-red-700 hover:bg-red-600 text-white rounded-full p-3 shadow-lg border-2 ${activePanel === 'processor' ? 'border-white' : 'border-red-600'}`}
-                    title="Sample Editor"
-                  >
-                    <Settings size={24} />
-                  </button>
-                  <button 
-                    onClick={() => setActivePanel(activePanel === 'library' ? null : 'library')}
-                    className={`bg-red-700 hover:bg-red-600 text-white rounded-full p-3 shadow-lg border-2 ${activePanel === 'library' ? 'border-white' : 'border-red-600'}`}
-                    title="Sound Library"
-                  >
-                    <Library size={24} />
-                  </button>
-                  <button 
-                    onClick={() => setActivePanel(activePanel === 'chopblock' ? null : 'chopblock')}
-                    className={`bg-red-700 hover:bg-red-600 text-white rounded-full p-3 shadow-lg border-2 ${activePanel === 'chopblock' ? 'border-white' : 'border-red-600'}`}
-                    title="Chop Block"
-                  >
-                    <Scissors size={24} />
-                  </button>
-                  <button 
-                    onClick={() => setActivePanel(activePanel === 'midiGrid' ? null : 'midiGrid')}
-                    className={`bg-red-700 hover:bg-red-600 text-white rounded-full p-3 shadow-lg border-2 ${activePanel === 'midiGrid' ? 'border-white' : 'border-red-600'}`}
-                    title="MIDI Grid"
-                  >
-                    <Grid size={24} />
-                  </button>
-                  <button 
-                    onClick={() => setActivePanel(activePanel === 'project' ? null : 'project')}
-                    className={`bg-red-700 hover:bg-red-600 text-white rounded-full p-3 shadow-lg border-2 ${activePanel === 'project' ? 'border-white' : 'border-red-600'}`}
-                    title="Projects"
-                  >
-                    <Database size={24} />
-                  </button>
-                </div>
-              )}
+              {/* Floating menu button integrated with Sheet */}
+              <Sheet open={isDrawerOpen} onOpenChange={setIsDrawerOpen}>
+                <SheetTrigger asChild>
+                  <div className="absolute bottom-20 right-4 z-10">
+                    <button
+                      className="bg-red-700 hover:bg-red-600 text-white rounded-full p-3 shadow-lg border-2 border-red-600"
+                    >
+                      <Menu size={24} />
+                    </button>
+                  </div>
+                </SheetTrigger>
+                <SheetContent side="left" className="bg-red-900 text-white border-r-2 border-red-700 w-[280px] sm:w-[320px]">
+                  <SheetHeader className="mb-4">
+                    <SheetTitle className="text-2xl font-bold text-white flex justify-between items-center">
+                      Navigation
+                      <SheetClose asChild>
+                        <button className="text-white hover:text-red-300">
+                          <X size={24} />
+                        </button>
+                      </SheetClose>
+                    </SheetTitle>
+                  </SheetHeader>
+                  <div className="flex flex-col gap-2">
+                    {[
+                      { panel: 'transport', label: 'Transport', icon: Sliders },
+                      { panel: 'sequencer', label: 'Sequencer', icon: Save },
+                      { panel: 'processor', label: 'Sample Editor', icon: Settings },
+                      { panel: 'library', label: 'Sound Library', icon: Library },
+                      { panel: 'chopblock', label: 'Chop Block', icon: Scissors },
+                      { panel: 'midiGrid', label: 'MIDI Grid', icon: Grid },
+                      { panel: 'project', label: 'Projects', icon: Database },
+                    ].map(({ panel, label, icon: Icon }) => (
+                      <button
+                        key={panel}
+                        onClick={() => {
+                          setActivePanel(panel);
+                          setIsDrawerOpen(false);
+                        }}
+                        className={`w-full flex items-center justify-start gap-3 p-3 rounded-md text-left hover:bg-red-800 transition-colors ${activePanel === panel ? 'bg-red-700 font-semibold' : 'bg-transparent'}`}
+                      >
+                        <Icon size={20} />
+                        <span>{label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </SheetContent>
+              </Sheet>
               
               {/* Sliding panels */}
               <div className={`absolute inset-0 bg-black/40 z-5 transition-opacity ${activePanel ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}></div>
