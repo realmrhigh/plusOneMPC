@@ -16,8 +16,18 @@ import kotlinx.coroutines.flow.MutableSharedFlow // For UI Events
 import kotlinx.coroutines.flow.asSharedFlow // For UI Events
 import kotlinx.coroutines.launch
 import java.util.UUID
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.OptIn
 
-class DrumMachineViewModel(application: Application, private val audioPlayer: AudioPlayer) : AndroidViewModel(application) {
+interface DrumMachineViewInterface {
+    fun renamePattern(patternId: Int, newName: String) // open is default for interface methods
+    fun deletePattern(patternId: Int)
+    fun createNewPattern()
+    fun saveCurrentAssignmentsAsKit(kitName: String)
+}
+
+@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+class DrumMachineViewModel(application: Application, private val audioPlayer: AudioPlayer) : AndroidViewModel(application), DrumMachineViewInterface {
 
     private val app = application // Store application context for SharedPreferences
 
@@ -257,42 +267,6 @@ class DrumMachineViewModel(application: Application, private val audioPlayer: Au
         // PersistenceManager.savePatterns(app, _patterns.value) // Already in updatePatternInList
     }
 
-    fun renamePattern(patternId: Int, newName: String) {
-        _patterns.value = _patterns.value.map {
-            if (it.id == patternId) {
-                it.copy(name = newName)
-            } else { it }
-        }
-        PersistenceManager.savePatterns(app, _patterns.value)
-    }
-
-    fun deletePattern(patternId: Int) {
-        val currentPatterns = _patterns.value
-        val patternToRemove = currentPatterns.find { it.id == patternId } ?: return
-
-        _patterns.value = currentPatterns - patternToRemove
-        PersistenceManager.savePatterns(app, _patterns.value)
-
-        if (_currentPatternId.value == patternId) {
-            _currentPatternId.value = _patterns.value.firstOrNull()?.id
-            PersistenceManager.saveString(app, PersistenceManager.KEY_CURRENT_PATTERN_ID, _currentPatternId.value?.toString())
-        }
-    }
-
-    fun createNewPattern() {
-        val newId = (_patterns.value.maxOfOrNull { it.id } ?: 0) + 1
-        val newPatternName = "Pattern $newId"
-        val defaultTracksForNewPattern = listOf(
-            Track(padId = 0, steps = List(NUM_STEPS) { false }),
-            Track(padId = 1, steps = List(NUM_STEPS) { false })
-        )
-        val newPattern = Pattern(id = newId, name = newPatternName, tracks = defaultTracksForNewPattern)
-        _patterns.value = _patterns.value + newPattern
-        PersistenceManager.savePatterns(app, _patterns.value)
-        _currentPatternId.value = newId
-        PersistenceManager.saveString(app, PersistenceManager.KEY_CURRENT_PATTERN_ID, _currentPatternId.value?.toString())
-    }
-
     fun selectPattern(patternId: Int) {
         if (_patterns.value.any { it.id == patternId }) {
             _currentPatternId.value = patternId
@@ -316,21 +290,6 @@ class DrumMachineViewModel(application: Application, private val audioPlayer: Au
                 )
             }
         }
-    }
-
-    fun saveCurrentAssignmentsAsKit(kitName: String) {
-        val currentPadSettingsMap = _pads.value.associate { pad ->
-            pad.id to PadSettings(sampleId = pad.sampleId, volume = pad.volume, pitch = pad.pitch)
-        }
-
-        val newKit = DrumKit(
-            id = UUID.randomUUID().toString(),
-            name = kitName.ifBlank { "Untitled Kit" },
-            padSettings = currentPadSettingsMap
-        )
-        _kits.value = _kits.value + newKit
-        PersistenceManager.saveKits(app, _kits.value)
-        selectKit(newKit.id) // This will also save the new activeKitId
     }
 
     fun assignSampleToPad(padId: Int, newSampleId: String?) {
