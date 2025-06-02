@@ -19,7 +19,7 @@ data class Sample(val id: String, val name: String, val resourceId: Int)
 @Serializable
 data class Pad(
     val id: Int,
-    val sampleId: String?,
+    var sampleId: String?,
     val volume: Float = 1.0f, // Default volume
     val pitch: Float = 0.0f   // Default pitch (in semitones, 0.0f is no change)
 )

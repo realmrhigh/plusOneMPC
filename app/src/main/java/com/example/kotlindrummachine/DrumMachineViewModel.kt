@@ -17,7 +17,7 @@ import kotlinx.coroutines.flow.asSharedFlow // For UI Events
 import kotlinx.coroutines.launch
 import java.util.UUID
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.OptIn
+//import kotlinx.coroutines.OptIn
 
 interface DrumMachineViewInterface {
     fun renamePattern(patternId: Int, newName: String) // open is default for interface methods
@@ -26,8 +26,8 @@ interface DrumMachineViewInterface {
     fun saveCurrentAssignmentsAsKit(kitName: String)
 }
 
-@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
-class DrumMachineViewModel(application: Application, private val audioPlayer: AudioPlayer) : AndroidViewModel(application), DrumMachineViewInterface {
+@OptIn(ExperimentalCoroutinesApi::class)
+open class DrumMachineViewModel(application: Application, private val audioPlayer: AudioPlayer) : AndroidViewModel(application), DrumMachineViewInterface {
 
     private val app = application // Store application context for SharedPreferences
 
@@ -48,80 +48,80 @@ class DrumMachineViewModel(application: Application, private val audioPlayer: Au
 
     // Samples State
     private val _samples = MutableStateFlow<List<Sample>>(emptyList())
-    val samples: StateFlow<List<Sample>> = _samples.asStateFlow()
+    open val samples: StateFlow<List<Sample>> = _samples.asStateFlow()
 
     // Pads State
     private val _pads = MutableStateFlow<List<Pad>>(emptyList())
-    val pads: StateFlow<List<Pad>> = _pads.asStateFlow()
+    open val pads: StateFlow<List<Pad>> = _pads.asStateFlow()
 
     // Multiple Patterns Management
     private val _patterns = MutableStateFlow<List<Pattern>>(emptyList())
-    val patterns: StateFlow<List<Pattern>> = _patterns.asStateFlow()
+    open val patterns: StateFlow<List<Pattern>> = _patterns.asStateFlow()
 
     private val _currentPatternId = MutableStateFlow<Int?>(null)
-    val currentPatternId: StateFlow<Int?> = _currentPatternId.asStateFlow()
+    open val currentPatternId: StateFlow<Int?> = _currentPatternId.asStateFlow()
 
-    val currentPattern: StateFlow<Pattern?> = combine(patterns, currentPatternId) { patternList, currentId ->
+    open val currentPattern: StateFlow<Pattern?> = combine(patterns, currentPatternId) { patternList, currentId ->
         patternList.find { it.id == currentId }
     }.stateIn(viewModelScope, SharingStarted.Lazily, null)
 
 
     // Drum Kits Management
     private val _kits = MutableStateFlow<List<DrumKit>>(emptyList())
-    val kits: StateFlow<List<DrumKit>> = _kits.asStateFlow()
+    open val kits: StateFlow<List<DrumKit>> = _kits.asStateFlow()
 
     private val _activeKitId = MutableStateFlow<String?>(null)
-    val activeKitId: StateFlow<String?> = _activeKitId.asStateFlow()
+    open val activeKitId: StateFlow<String?> = _activeKitId.asStateFlow()
 
-    val activeKitName: StateFlow<String> = combine(kits, activeKitId) { kitList, currentId ->
+    open val activeKitName: StateFlow<String> = combine(kits, activeKitId) { kitList, currentId ->
         kitList.find { it.id == currentId }?.name ?: "No Kit Selected"
     }.stateIn(viewModelScope, SharingStarted.Lazily, "No Kit Selected")
 
 
     // Tempo Control
     private val _tempo = MutableStateFlow(PersistenceManager.loadInt(app, PersistenceManager.KEY_TEMPO, 120))
-    val tempo: StateFlow<Int> = _tempo.asStateFlow()
+    open val tempo: StateFlow<Int> = _tempo.asStateFlow()
 
     // Metronome State
     private val _isMetronomeEnabled = MutableStateFlow(PersistenceManager.loadBoolean(app, PersistenceManager.KEY_METRONOME_ENABLED, false))
-    val isMetronomeEnabled: StateFlow<Boolean> = _isMetronomeEnabled.asStateFlow()
+    open val isMetronomeEnabled: StateFlow<Boolean> = _isMetronomeEnabled.asStateFlow()
 
     private val _metronomeVolume = MutableStateFlow(PersistenceManager.loadFloat(app, PersistenceManager.KEY_METRONOME_VOLUME, 0.75f))
-    val metronomeVolume: StateFlow<Float> = _metronomeVolume.asStateFlow()
+    open val metronomeVolume: StateFlow<Float> = _metronomeVolume.asStateFlow()
 
     // 16 Levels Mode State
     private val _is16LevelsModeActive = MutableStateFlow(PersistenceManager.loadBoolean(app, PersistenceManager.KEY_16_LEVELS_ACTIVE, false))
-    val is16LevelsModeActive: StateFlow<Boolean> = _is16LevelsModeActive.asStateFlow()
+    open val is16LevelsModeActive: StateFlow<Boolean> = _is16LevelsModeActive.asStateFlow()
 
     // Load source pad ID, defaulting to -1 if not found, ViewModel interprets -1 as null/not set.
-    private val _levelsSourcePadId = MutableStateFlow<Int?>(
+    private val _levelsSourcePadId = MutableStateFlow(
         PersistenceManager.loadInt(app, PersistenceManager.KEY_16_LEVELS_SOURCE_PAD_ID, -1)
             .let { if (it == -1) null else it }
     )
-    val levelsSourcePadId: StateFlow<Int?> = _levelsSourcePadId.asStateFlow()
+    open val levelsSourcePadId: StateFlow<Int?> = _levelsSourcePadId.asStateFlow()
 
     private val _isSelectingLevelsSourcePad = MutableStateFlow(false) // Transient state, not persisted
-    val isSelectingLevelsSourcePad: StateFlow<Boolean> = _isSelectingLevelsSourcePad.asStateFlow()
+    open val isSelectingLevelsSourcePad: StateFlow<Boolean> = _isSelectingLevelsSourcePad.asStateFlow()
 
-    val canSetSourcePad: StateFlow<Boolean> = pads.mapLatest { padList ->
+    open val canSetSourcePad: StateFlow<Boolean> = pads.mapLatest { padList ->
         padList.any { it.sampleId != null }
     }.stateIn(viewModelScope, SharingStarted.Lazily, false)
 
 
     // UI Events
     private val _uiEvents = MutableSharedFlow<String>()
-    val uiEvents = _uiEvents.asSharedFlow()
+    open val uiEvents = _uiEvents.asSharedFlow()
 
 
     // Playback State
     private val _isPlaying = MutableStateFlow(false) // Playback state is not persisted
-    val isPlaying: StateFlow<Boolean> = _isPlaying.asStateFlow()
+    open val isPlaying: StateFlow<Boolean> = _isPlaying.asStateFlow()
 
     private val _isRecording = MutableStateFlow(false)
-    val isRecording: StateFlow<Boolean> = _isRecording.asStateFlow()
+    open val isRecording: StateFlow<Boolean> = _isRecording.asStateFlow()
 
     private val _currentStepIndex = MutableStateFlow(0)
-    val currentStepIndex: StateFlow<Int> = _currentStepIndex.asStateFlow()
+    open val currentStepIndex: StateFlow<Int> = _currentStepIndex.asStateFlow()
 
     private var sequencerJob: Job? = null
 
@@ -156,7 +156,7 @@ class DrumMachineViewModel(application: Application, private val audioPlayer: Au
                     .mapKeys {
                         // This mapping is flawed, need to map by pad ID during creation.
                         // Corrected logic: (0 until NUM_STEPS).associateWith { defaultPadsForKit[it] }
-                         val padId = defaultPadsForKit.indexOfFirst { settings ->
+                         val padId = defaultPadsForKit.indexOfFirst { _ ->
                             // This is still not right, need to map 0..15 to the settings.
                             // Example: index to PadSetting.
                             // Let's assume defaultPadsForKit is already implicitly indexed 0..15
@@ -233,7 +233,7 @@ class DrumMachineViewModel(application: Application, private val audioPlayer: Au
     }
 
 
-    fun toggleStep(padId: Int, stepIndex: Int) {
+    open fun toggleStep(padId: Int, stepIndex: Int) {
         val currentId = _currentPatternId.value ?: return
         updatePatternInList(currentId) { patternToUpdate ->
             val trackIndex = patternToUpdate.tracks.indexOfFirst { it.padId == padId }
@@ -250,7 +250,7 @@ class DrumMachineViewModel(application: Application, private val audioPlayer: Au
         // PersistenceManager.savePatterns(app, _patterns.value) // Already in updatePatternInList
     }
 
-    fun activateStep(padId: Int, stepIndex: Int) {
+    private fun activateStep(padId: Int, stepIndex: Int) {
         val currentId = _currentPatternId.value ?: return
         updatePatternInList(currentId) { patternToUpdate ->
             val trackIndex = patternToUpdate.tracks.indexOfFirst { it.padId == padId }
@@ -267,14 +267,14 @@ class DrumMachineViewModel(application: Application, private val audioPlayer: Au
         // PersistenceManager.savePatterns(app, _patterns.value) // Already in updatePatternInList
     }
 
-    fun selectPattern(patternId: Int) {
+    open fun selectPattern(patternId: Int) {
         if (_patterns.value.any { it.id == patternId }) {
             _currentPatternId.value = patternId
             PersistenceManager.saveString(app, PersistenceManager.KEY_CURRENT_PATTERN_ID, _currentPatternId.value?.toString())
         }
     }
 
-    fun selectKit(kitId: String) {
+    open fun selectKit(kitId: String) {
         val selectedKit = _kits.value.find { it.id == kitId }
         if (selectedKit != null) {
             _activeKitId.value = kitId
@@ -292,7 +292,7 @@ class DrumMachineViewModel(application: Application, private val audioPlayer: Au
         }
     }
 
-    fun assignSampleToPad(padId: Int, newSampleId: String?) {
+    open fun assignSampleToPad(padId: Int, newSampleId: String?) {
         _pads.value = _pads.value.map {
             if (it.id == padId) {
                 it.copy(sampleId = newSampleId)
@@ -302,7 +302,7 @@ class DrumMachineViewModel(application: Application, private val audioPlayer: Au
         // For now, kit changes are explicit via "Save Kit".
     }
 
-    fun setPadVolume(padId: Int, newVolume: Float) {
+    open fun setPadVolume(padId: Int, newVolume: Float) {
         val clampedVolume = newVolume.coerceIn(0.0f, 1.0f)
         _pads.value = _pads.value.map {
             if (it.id == padId) {
@@ -313,7 +313,7 @@ class DrumMachineViewModel(application: Application, private val audioPlayer: Au
         }
     }
 
-    fun setPadPitch(padId: Int, newPitch: Float) {
+    open fun setPadPitch(padId: Int, newPitch: Float) {
         val clampedPitch = newPitch.coerceIn(-12.0f, 12.0f) // Example range: +/- 1 octave
         _pads.value = _pads.value.map {
             if (it.id == padId) {
@@ -324,23 +324,23 @@ class DrumMachineViewModel(application: Application, private val audioPlayer: Au
         }
     }
 
-    fun setTempo(newTempo: Int) {
+    open fun setTempo(newTempo: Int) {
         val clampedTempo = newTempo.coerceIn(40, 240) // Already have this logic from previous diff
         _tempo.value = clampedTempo // Ensure this is before save
         PersistenceManager.saveInt(app, PersistenceManager.KEY_TEMPO, clampedTempo)
     }
 
-    fun toggleMetronome() {
+    open fun toggleMetronome() {
         _isMetronomeEnabled.value = !_isMetronomeEnabled.value
         PersistenceManager.saveBoolean(app, PersistenceManager.KEY_METRONOME_ENABLED, _isMetronomeEnabled.value)
     }
 
-    fun setMetronomeVolume(newVolume: Float) {
+    open fun setMetronomeVolume(newVolume: Float) {
         _metronomeVolume.value = newVolume.coerceIn(0.0f, 1.0f)
         PersistenceManager.saveFloat(app, PersistenceManager.KEY_METRONOME_VOLUME, _metronomeVolume.value)
     }
 
-    fun toggle16LevelsMode() {
+    open fun toggle16LevelsMode() {
         val isActive = !_is16LevelsModeActive.value
         _is16LevelsModeActive.value = isActive
         PersistenceManager.saveBoolean(app, PersistenceManager.KEY_16_LEVELS_ACTIVE, isActive)
@@ -352,7 +352,7 @@ class DrumMachineViewModel(application: Application, private val audioPlayer: Au
         }
     }
 
-    fun startSelectingLevelsSourcePad() {
+    open fun startSelectingLevelsSourcePad() {
         // Should only be callable if 16 levels mode is already active or is being activated.
         // For simplicity, let's assume UI enables this button correctly.
         _is16LevelsModeActive.value = true // Ensure mode is active
@@ -360,7 +360,7 @@ class DrumMachineViewModel(application: Application, private val audioPlayer: Au
         _isSelectingLevelsSourcePad.value = true
     }
 
-    fun setLevelsSourcePad(padId: Int) {
+    open fun setLevelsSourcePad(padId: Int) {
         val sourcePad = _pads.value.find { it.id == padId }
         if (sourcePad?.sampleId != null) {
             _levelsSourcePadId.value = padId
@@ -378,7 +378,7 @@ class DrumMachineViewModel(application: Application, private val audioPlayer: Au
         }
     }
 
-    fun clearCurrentPattern() {
+    open fun clearCurrentPattern() {
         val currentId = _currentPatternId.value ?: return
         var clearedPatternName = "Unknown"
 
@@ -444,7 +444,7 @@ class DrumMachineViewModel(application: Application, private val audioPlayer: Au
             Track(padId = 1, steps = List(NUM_STEPS) { false })
         )
         val newPattern = Pattern(id = newId, name = newPatternName, tracks = defaultTracksForNewPattern)
-        _patterns.value = _patterns.value + newPattern
+        _patterns.value += newPattern
         PersistenceManager.savePatterns(app, _patterns.value)
         _currentPatternId.value = newId
         PersistenceManager.saveString(app, PersistenceManager.KEY_CURRENT_PATTERN_ID, _currentPatternId.value?.toString())
@@ -464,7 +464,7 @@ class DrumMachineViewModel(application: Application, private val audioPlayer: Au
             name = kitNameToSave,
             padSettings = currentPadSettingsMap
         )
-        _kits.value = _kits.value + newKit
+        _kits.value += newKit
         PersistenceManager.saveKits(app, _kits.value)
         selectKit(newKit.id) // This will also save the new activeKitId
         viewModelScope.launch {
@@ -473,23 +473,23 @@ class DrumMachineViewModel(application: Application, private val audioPlayer: Au
     }
 
 
-    fun toggleRecording() {
+    open fun toggleRecording() {
         _isRecording.value = !_isRecording.value
     }
 
-    fun recordPadTap(padId: Int) {
+    open fun recordPadTap(padId: Int) {
         if (_isPlaying.value && _isRecording.value) { // Check recording state as well
             val currentStep = _currentStepIndex.value
             activateStep(padId, currentStep)
         }
     }
 
-    fun startPlayback() {
+    open fun startPlayback() {
         _isPlaying.value = true
         // Sequencer loop is already running and will pick up the isPlaying state
     }
 
-    fun stopPlayback() {
+    open fun stopPlayback() {
         _isPlaying.value = false
         // _isRecording.value = false // Optionally stop recording when playback stops
         _currentStepIndex.value = 0

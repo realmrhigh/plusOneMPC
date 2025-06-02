@@ -30,7 +30,6 @@ import androidx.compose.material.AlertDialog
 import androidx.compose.material.TextField
 import androidx.compose.material.DropdownMenu
 import androidx.compose.material.DropdownMenuItem
-import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -41,9 +40,9 @@ import kotlinx.coroutines.flow.MutableSharedFlow // For Preview uiEvents
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.asSharedFlow // For Preview uiEvents
-import java.util.UUID
 import androidx.lifecycle.ViewModel // Specific import
 import androidx.lifecycle.viewModelScope // For this.viewModelScope
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.StateFlow // Ensure this is present
 import kotlinx.coroutines.flow.combine // Ensure this is present
 import kotlinx.coroutines.flow.mapLatest // Ensure this is present
@@ -611,6 +610,7 @@ fun DrumMachineApp(
     }
 }
 
+@OptIn(ExperimentalCoroutinesApi::class)
 @Preview(showBackground = true)
 @Composable
 fun DefaultPreview() {
@@ -620,40 +620,40 @@ fun DefaultPreview() {
 
     class PreviewDrumMachineViewModel(application: Application, audioPlayer: AudioPlayer) : DrumMachineViewModel(application, audioPlayer) {
         // Properties: These are re-declared (hiding base class's) for the preview's distinct state. No 'override'.
-        val pads = MutableStateFlow(List(16) { Pad(it, null) }.apply { find {it.id == 0}?.sampleId = "kick"; find {it.id == 1}?.sampleId = "snare" }).asStateFlow()
-        val isPlaying = MutableStateFlow(false).asStateFlow()
-        val isRecording = MutableStateFlow(false).asStateFlow()
-        val currentStepIndex = MutableStateFlow(0).asStateFlow()
+        override val pads = MutableStateFlow(List(16) { Pad(it, null) }.apply { find {it.id == 0}?.sampleId = "kick"; find {it.id == 1}?.sampleId = "snare" }).asStateFlow()
+        override val isPlaying = MutableStateFlow(false).asStateFlow()
+        override val isRecording = MutableStateFlow(false).asStateFlow()
+        override val currentStepIndex = MutableStateFlow(0).asStateFlow()
 
         private val _initialPatterns_preview = listOf(Pattern(1, "Pattern 1", listOf(
             Track(0, steps = List(NUM_STEPS){ it % 4 == 0}), // NUM_STEPS is from DrumMachineViewModel companion
             Track(1, steps = List(NUM_STEPS){(it + 2) % 4 == 0 })
         )))
         private val _patterns_preview = MutableStateFlow(_initialPatterns_preview)
-        val patterns = _patterns_preview.asStateFlow() // Hides DrumMachineViewModel.patterns
+        override val patterns = _patterns_preview.asStateFlow() // Hides DrumMachineViewModel.patterns
 
         private val _currentPatternId_preview = MutableStateFlow<Int?>(_initialPatterns_preview.firstOrNull()?.id)
-        val currentPatternId = _currentPatternId_preview.asStateFlow() // Hides DrumMachineViewModel.currentPatternId
+        override val currentPatternId = _currentPatternId_preview.asStateFlow() // Hides DrumMachineViewModel.currentPatternId
 
         // This uses the local 'patterns' and 'currentPatternId' which are the preview versions.
-        val currentPattern: StateFlow<Pattern?> = combine(patterns, currentPatternId) { patternList, currentId ->
+        override val currentPattern: StateFlow<Pattern?> = combine(patterns, currentPatternId) { patternList, currentId ->
             patternList.find { it.id == currentId }
         }.stateIn(this.viewModelScope, SharingStarted.Lazily, _initialPatterns_preview.firstOrNull()) // Hides
 
-        val tempo = MutableStateFlow(120).asStateFlow() // Hides
-        val samples = MutableStateFlow(listOf(Sample("kick", "Kick", 0), Sample("snare", "Snare", 1))).asStateFlow() // Hides
+        override val tempo = MutableStateFlow(120).asStateFlow() // Hides
+        override val samples = MutableStateFlow(listOf(Sample("kick", "Kick", 0), Sample("snare", "Snare", 1))).asStateFlow() // Hides
 
         private val _defaultKit_preview = DrumKit(
             "default_kit_id_preview", "Default Kit Preview",
             mapOf(0 to PadSettings(sampleId = "kick"), 1 to PadSettings(sampleId = "snare"))
         )
         private val _kits_preview = MutableStateFlow(listOf(_defaultKit_preview))
-        val kits = _kits_preview.asStateFlow() // Hides
+        override val kits = _kits_preview.asStateFlow() // Hides
 
         private val _activeKitId_preview = MutableStateFlow<String?>(_defaultKit_preview.id)
-        val activeKitId = _activeKitId_preview.asStateFlow() // Hides
+        override val activeKitId = _activeKitId_preview.asStateFlow() // Hides
 
-        val activeKitName: StateFlow<String> = combine(kits, activeKitId) { kitList, currentId ->
+        override val activeKitName: StateFlow<String> = combine(kits, activeKitId) { kitList, currentId ->
              kitList.find { it.id == currentId }?.name ?: "No Kit Selected"
         }.stateIn(this.viewModelScope, SharingStarted.Lazily, "No Kit Selected") // Hides
 
@@ -686,34 +686,34 @@ fun DefaultPreview() {
         }
         override fun selectKit(kitId: String) { _activeKitId_preview.value = kitId }
         override fun saveCurrentAssignmentsAsKit(kitName: String) { /* Custom preview logic for kits_preview */ }
-        override fun assignSampleToPad(padId: Int, sampleId: String?) { /* Custom preview logic for pads.value */ }
-        override fun setPadVolume(padId: Int, volume: Float) { /* Custom preview logic */ }
-        override fun setPadPitch(padId: Int, pitch: Float) { /* Custom preview logic */ }
+        override fun assignSampleToPad(padId: Int, newSampleId: String?) { /* Custom preview logic for pads.value */ }
+        override fun setPadVolume(padId: Int, newVolume: Float) { /* Custom preview logic */ }
+        override fun setPadPitch(padId: Int, newPitch: Float) { /* Custom preview logic */ }
 
         // Metronome related states and methods (hiding and overriding)
         private val _isMetronomeEnabled_preview = MutableStateFlow(false)
-        val isMetronomeEnabled = _isMetronomeEnabled_preview.asStateFlow() // Hides
+        override val isMetronomeEnabled = _isMetronomeEnabled_preview.asStateFlow() // Hides
         override fun toggleMetronome() { _isMetronomeEnabled_preview.value = !_isMetronomeEnabled_preview.value }
 
         private val _metronomeVolume_preview = MutableStateFlow(0.75f)
-        val metronomeVolume = _metronomeVolume_preview.asStateFlow() // Hides
-        override fun setMetronomeVolume(vol: Float) { _metronomeVolume_preview.value = vol.coerceIn(0f, 1f) }
+        override val metronomeVolume = _metronomeVolume_preview.asStateFlow() // Hides
+        override fun setMetronomeVolume(newVolume: Float) { _metronomeVolume_preview.value = newVolume.coerceIn(0f, 1f) }
 
 
         // 16 Levels Preview States & Functions (hiding and overriding)
         private val _is16LevelsModeActive_preview = MutableStateFlow(false)
-        val is16LevelsModeActive = _is16LevelsModeActive_preview.asStateFlow() // Hides
+        override val is16LevelsModeActive = _is16LevelsModeActive_preview.asStateFlow() // Hides
 
         private val _levelsSourcePadId_preview = MutableStateFlow<Int?>(null)
-        val levelsSourcePadId = _levelsSourcePadId_preview.asStateFlow() // Hides
+        override val levelsSourcePadId = _levelsSourcePadId_preview.asStateFlow() // Hides
 
         private val _isSelectingLevelsSourcePad_preview = MutableStateFlow(false)
-        val isSelectingLevelsSourcePad = _isSelectingLevelsSourcePad_preview.asStateFlow() // Hides
+        override val isSelectingLevelsSourcePad = _isSelectingLevelsSourcePad_preview.asStateFlow() // Hides
         
-        val canSetSourcePad = pads.mapLatest { padList -> padList.any { it.sampleId != null } }.stateIn(this.viewModelScope, SharingStarted.Lazily, false) // Hides
+        override val canSetSourcePad = pads.mapLatest { padList -> padList.any { it.sampleId != null } }.stateIn(this.viewModelScope, SharingStarted.Lazily, false) // Hides
 
         private val _uiEvents_preview = MutableSharedFlow<String>()
-        val uiEvents = _uiEvents_preview.asSharedFlow() // Hides
+        override val uiEvents = _uiEvents_preview.asSharedFlow() // Hides
 
 
         override fun toggle16LevelsMode() { _is16LevelsModeActive_preview.value = !_is16LevelsModeActive_preview.value }
