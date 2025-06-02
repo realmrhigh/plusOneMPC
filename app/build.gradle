@@ -1,15 +1,16 @@
 plugins {
     id 'com.android.application'
     id 'kotlin-android'
-    id 'org.jetbrains.kotlin.plugin.serialization' version '1.8.10' // Or match your Kotlin version
+    id 'org.jetbrains.kotlin.plugin.serialization' version '1.9.23'
+    alias(libs.plugins.kotlin.compose) // Or match your Kotlin version
 }
 
 android {
-    compileSdkVersion 33
+    compileSdk 36
     defaultConfig {
         applicationId "com.example.kotlindrummachine"
         minSdkVersion 21
-        targetSdkVersion 33
+        targetSdk 36
         versionCode 1
         versionName "1.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
@@ -37,16 +38,16 @@ android {
 }
 
 dependencies {
-    implementation 'androidx.core:core-ktx:1.9.0'
-    implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.6.2'
-    implementation 'androidx.activity:activity-compose:1.7.0'
-    implementation "androidx.compose.ui:ui:1.3.3" // Check for latest version
-    implementation "androidx.compose.ui:ui-tooling-preview:1.3.3" // Check for latest version
-    implementation "androidx.compose.material:material:1.3.1" // Check for latest version
-    implementation "org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.0" // Serialization
-    testImplementation 'junit:junit:4.13.2'
-    androidTestImplementation 'androidx.test.ext:junit:1.1.5'
-    androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
-    androidTestImplementation "androidx.compose.ui:ui-test-junit4:1.3.3" // Check for latest version
-    debugImplementation "androidx.compose.ui:ui-tooling:1.3.3" // Check for latest version
+    implementation libs.androidx.core.ktx.v190
+    implementation libs.androidx.lifecycle.runtime.ktx.v262
+    implementation libs.androidx.activity.compose.v170
+    implementation libs.ui // Check for latest version
+    implementation libs.ui.tooling.preview // Check for latest version
+    implementation libs.androidx.material // Check for latest version
+    implementation libs.kotlinx.serialization.json // Serialization
+    testImplementation libs.junit
+    androidTestImplementation libs.androidx.junit.v115
+    androidTestImplementation libs.androidx.espresso.core.v351
+    androidTestImplementation libs.ui.test.junit4 // Check for latest version
+    debugImplementation libs.ui.tooling // Check for latest version
 }
