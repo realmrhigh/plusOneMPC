@@ -208,7 +208,7 @@ function App() {
                   >
                     <Grid size={24} />
                   </button>
-                  <button
+                  <button 
                     onClick={() => setActivePanel(activePanel === 'project' ? null : 'project')}
                     className={`bg-red-700 hover:bg-red-600 text-white rounded-full p-3 shadow-lg border-2 ${activePanel === 'project' ? 'border-white' : 'border-red-600'}`}
                     title="Projects"
@@ -331,7 +331,7 @@ function App() {
                 <div className="p-3">
                   <div className="flex justify-between items-center mb-2">
                     <h2 className="text-xl font-bold text-white">Project Management</h2>
-                    <button
+                    <button 
                       onClick={() => setActivePanel(null)}
                       className="bg-red-700 hover:bg-red-600 text-white rounded-full p-1"
                     >

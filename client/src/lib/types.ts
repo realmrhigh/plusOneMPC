@@ -2,8 +2,10 @@
 export interface Sample {
   id: string;
   name: string;
-  file: string;
+  file?: string; // Optional: URL for full samples, not present for slices
   color: string;
+  isSlice?: boolean;    // True if this sample is a derived slice
+  originalFileName?: string; // Name of the file this slice came from (if applicable)
 }
 
 // Pad interface

@@ -77,6 +77,9 @@ interface DrumMachineState {
   listProjects: () => string[];
   deleteProject: (projectName: string) => void;
   currentProjectName: string | null;
+
+  // Sliced samples
+  addNewSampleFromBuffer: (name: string, buffer: AudioBuffer, originalFileName?: string, color?: string) => Promise<string>;
 }
 
 export const useDrumMachineStore = create<DrumMachineState>()(
@@ -907,6 +910,33 @@ export const useDrumMachineStore = create<DrumMachineState>()(
           set({ currentProjectName: null });
           // Optionally, reset to a default state or clear the current project related data
         }
+      },
+
+      addNewSampleFromBuffer: async (name: string, buffer: AudioBuffer, originalFileName?: string, color?: string) => {
+        const newSampleId = `slice-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+        
+        // Add buffer to audioEngine's cache
+        audioEngine.addSlicedBuffer(newSampleId, buffer);
+ 
+        const newSample: Sample = {
+          id: newSampleId,
+          name: name,
+          // file: undefined, // Slices don't have a file URL in the same way as samples loaded from user file system.
+          color: color || '#7f8c8d', // A neutral slice color like slate gray
+          isSlice: true,
+          originalFileName: originalFileName,
+        };
+ 
+        set(state => ({
+          samples: [...state.samples, newSample]
+        }));
+        
+        // Note: Persistence of the actual slice AudioBuffer data is not handled here.
+        // Only the metadata (Sample object) is added to the store's samples array.
+        // If projects are saved, this metadata will be saved.
+        // On load, audioEngine.slicedBufferCache will be empty unless slices are re-created.
+ 
+        return newSampleId;
       },
     };
   })

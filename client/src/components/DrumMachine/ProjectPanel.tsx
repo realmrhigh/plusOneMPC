@@ -12,12 +12,12 @@ interface ProjectPanelProps {
 }
 
 const ProjectPanel: React.FC<ProjectPanelProps> = ({ onClose }) => {
-  const {
-    saveProject,
-    loadProject,
-    listProjects,
-    deleteProject,
-    currentProjectName
+  const { 
+    saveProject, 
+    loadProject, 
+    listProjects, 
+    deleteProject, 
+    currentProjectName 
   } = useDrumMachineStore();
 
   const [projectNameInput, setProjectNameInput] = useState('');
@@ -85,15 +85,15 @@ const ProjectPanel: React.FC<ProjectPanelProps> = ({ onClose }) => {
       <div>
         <h3 className="text-lg font-semibold mb-2 text-white">Save Current Project As</h3>
         <div className="flex items-center gap-2">
-          <Input
+          <Input 
             type="text"
             placeholder="Enter new project name..."
             value={projectNameInput}
             onChange={(e) => setProjectNameInput(e.target.value)}
             className="bg-red-900 border-red-700 text-white placeholder-red-400 focus:border-red-500"
           />
-          <Button
-            onClick={handleSaveProject}
+          <Button 
+            onClick={handleSaveProject} 
             disabled={!projectNameInput.trim()}
             className="bg-green-600 hover:bg-green-500 text-white"
             title="Save Project"
@@ -117,18 +117,18 @@ const ProjectPanel: React.FC<ProjectPanelProps> = ({ onClose }) => {
                 <li key={name} className="flex items-center justify-between p-2 bg-red-700 rounded-md hover:bg-red-600 transition-colors">
                   <span className="truncate text-sm font-medium text-white mr-2">{name}</span>
                   <div className="flex items-center gap-2 flex-shrink-0">
-                    <Button
-                      size="sm"
-                      variant="outline"
+                    <Button 
+                      size="sm" 
+                      variant="outline" 
                       onClick={() => handleLoadProject(name)}
                       className="bg-blue-600 hover:bg-blue-500 border-blue-500 text-white px-2"
                       title="Load Project"
                     >
                       <FolderOpen size={16} />
                     </Button>
-                    <Button
-                      size="sm"
-                      variant="destructive"
+                    <Button 
+                      size="sm" 
+                      variant="destructive" 
                       onClick={() => handleDeleteProject(name)}
                       className="bg-red-600 hover:bg-red-500 border-red-500 text-white px-2"
                       title="Delete Project"

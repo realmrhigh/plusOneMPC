@@ -3,6 +3,12 @@ import { Sample } from './types';
 
 // Store loaded samples
 const loadedSamples: Map<string, Tone.Player> = new Map();
+const slicedBufferCache = new Map<string, AudioBuffer>();
+
+export const addSlicedBuffer = (id: string, buffer: AudioBuffer): void => {
+  slicedBufferCache.set(id, buffer);
+  console.log(`Cached sliced buffer with ID: ${id}\`);
+};
 
 // Metronome state
 let isMetronomeEnabled = false;
@@ -76,100 +82,50 @@ export const setupAudioContext = async () => {
 
 // Load a sample file with improved handling for user samples
 export const loadSample = async (sample: Sample): Promise<void> => {
+  // If it's a slice, its buffer is already managed by addSlicedBuffer. No loading needed here.
+  if (sample.isSlice) {
+    // console.log(`Sample ${sample.name} is a slice, skipping URL loading.`);
+    return;
+  }
+
+  // Skip if already loaded in loadedSamples (for URL-based samples)
+  if (loadedSamples.has(sample.id)) {
+    // console.log(`Sample ${sample.name} already loaded from URL.`);
+    return;
+  }
+  
+  // Ensure there's a file path for non-slice samples
+  if (!sample.file) {
+    console.warn(`Sample ${sample.name} has no file path and is not a slice. Cannot load.`);
+    return;
+  }
+
   try {
-    // Skip if already loaded
-    if (loadedSamples.has(sample.id)) {
-      console.log(`Sample ${sample.name} already loaded`);
-      return;
-    }
+    // Detect if it's a user sample (from URL.createObjectURL, which starts with blob:)
+    // or a pre-defined sample from a relative/absolute URL.
+    const isUserFileBlob = sample.file.startsWith('blob:');
     
-    // Detect if it's a user sample (from URL.createObjectURL)
-    const isUserSample = sample.id.startsWith('user-');
+    console.log(`Loading sample: ${sample.name} from ${isUserFileBlob ? 'blob URL' : 'file path'}`);
+      
+    const player = new Tone.Player(sample.file).toDestination();
     
-    if (isUserSample) {
-      console.log(`Loading user sample: ${sample.name}`);
-      
-      try {
-        // For user samples, create a player with the blob URL
-        const player = new Tone.Player({
-          url: sample.file,
-          loop: false,
-          autostart: false
-        }).toDestination();
-        
-        // Store the player first so it's available even while loading
-        loadedSamples.set(sample.id, player);
-        
-        // Don't await Tone.loaded() which can be slow
-        console.log(`User sample ${sample.name} loading in background`);
-      } catch (userSampleError) {
-        console.error(`Failed to load user sample ${sample.name}:`, userSampleError);
-        
-        // Create an empty buffer player as fallback to prevent crashes
-        const fallbackBuffer = Tone.context.createBuffer(2, 44100, 44100);
-        const fallbackPlayer = new Tone.Player(fallbackBuffer).toDestination();
-        loadedSamples.set(sample.id, fallbackPlayer);
-      }
-    } else {
-      // Standard loading for built-in samples
-      console.log(`Loading built-in sample: ${sample.name}`);
-      
-      // For built-in samples, create a buffer filled with a simple sine tone
-      // to ensure there's always a valid buffer (avoid "not loaded" issues)
-      const sampleDuration = 0.5; // seconds
-      const sampleRate = 44100;
-      const buffer = Tone.context.createBuffer(2, sampleRate * sampleDuration, sampleRate);
-        
-      // Fill buffer with sine wave (a simple sound for all built-in samples)
-      for (let channel = 0; channel < 2; channel++) {
-        const channelData = buffer.getChannelData(channel);
-        const frequency = sample.id === 'kick1' ? 60 : 220; // Lower for kick
-        
-        for (let i = 0; i < channelData.length; i++) {
-          // Simple sine wave envelope
-          const t = i / sampleRate;
-          const amplitude = Math.exp(-5 * t); // Exponential decay
-          channelData[i] = amplitude * Math.sin(2 * Math.PI * frequency * t);
-        }
-      }
-      
-      // Create player with the buffer
-      const player = new Tone.Player(buffer);
-      player.toDestination();
-      
-      // Store the player in the map
-      loadedSamples.set(sample.id, player);
-      console.log(`Created built-in sample: ${sample.name}`);
-      
-      // Also start loading the actual sample file in the background
-      if (sample.file && !sample.file.startsWith('blob:')) {
-        console.log(`Background loading sample file: ${sample.file}`);
-        const actualPlayer = new Tone.Player({
-          url: sample.file,
-          onload: () => {
-            console.log(`Updated sample ${sample.name} with loaded file`);
-            loadedSamples.set(sample.id, actualPlayer);
-          }
-        }).toDestination();
-      }
-    }
+    // Store the player once Tone signals it's loaded.
+    // Tone.loaded() can be used, or player.loaded
+    await Tone.loaded(); // Wait for this specific player to load its data.
+
+    loadedSamples.set(sample.id, player);
+    console.log(`Sample ${sample.name} loaded and cached.`);
     
-    // Set a special property on the player to track our own loaded state
-    const playerObj = loadedSamples.get(sample.id);
-    if (playerObj) {
-      // Use a trick to track load state by adding our own property
-      // @ts-ignore - Adding custom property
-      playerObj._isReady = true;
-    }
+    // Set a special property on the player to track our own loaded state (optional, Tone.Player has 'loaded' property)
+    // const playerObj = loadedSamples.get(sample.id);
+    // if (playerObj) {
+    //   // @ts-ignore - Adding custom property
+    //   playerObj._isReady = true; // Or use player.loaded
+    // }
   } catch (error) {
-    // Log error but recover - don't let a sample loading error crash the app
     console.error(`Error in loadSample for ${sample.name}:`, error);
-    
-    // Create a fallback silent buffer
-    const fallbackBuffer = Tone.context.createBuffer(2, 44100, 44100);
-    const fallbackPlayer = new Tone.Player(fallbackBuffer).toDestination();
-    // @ts-ignore - Adding custom property
-    fallbackPlayer._isReady = true;
+    // Fallback: Create a silent Tone.Player if loading fails, to prevent crashes.
+    const fallbackPlayer = new Tone.Player(Tone.context.createBuffer(1, 1, Tone.context.sampleRate)).toDestination();
     loadedSamples.set(sample.id, fallbackPlayer);
   }
 };
@@ -181,147 +137,116 @@ export const playSample = (
   pitch: number = 0, 
   decay: number = 1
 ): void => {
-  if (!sampleId || !loadedSamples.has(sampleId)) {
-    console.warn(`Sample ${sampleId} not loaded or unavailable`);
-    return;
+  let bufferToPlay: AudioBuffer | undefined;
+
+  if (slicedBufferCache.has(sampleId)) {
+    bufferToPlay = slicedBufferCache.get(sampleId);
+    // console.log(`Playing slice from slicedBufferCache: ${sampleId}`);
+  } else {
+    const player = loadedSamples.get(sampleId);
+    if (player && player.loaded) { // Check if Tone.Player is loaded
+      bufferToPlay = player.buffer.get() as AudioBuffer; // Get the AudioBuffer from Tone.Buffer
+      // console.log(`Playing sample from loadedSamples: ${sampleId}`);
+    }
   }
 
-  try {
-    // Get the original player
-    const player = loadedSamples.get(sampleId)!;
-    const isUserSample = sampleId.startsWith('user-');
+  if (bufferToPlay) {
+    const context = getAudioContext();
+    const source = context.createBufferSource();
+    source.buffer = bufferToPlay;
+
+    const gainNode = context.createGain();
+    // Convert volume from dB to gain (0dB = 1, -Infinity dB = 0)
+    // Assuming 'volume' is in dB. If it's linear (0-1), Tone.dbToGain is not needed.
+    // For consistency with Tone.Player.volume which is in dB, we use dbToGain.
+    gainNode.gain.setValueAtTime(Tone.dbToGain(volume), context.currentTime);
     
-    // Always consider our samples ready to play
-    // We create fallbacks for all samples so they're always available
+    // Ensure decay is positive and within buffer duration for linearRamp
+    const effectiveBufferDuration = bufferToPlay.duration / (Math.pow(2, pitch / 12) || 1); // Adjust duration by pitch
+    const decayTime = Math.max(0.01, Math.min(effectiveBufferDuration, decay));
     
-    // Log the attempt
-    console.log(`Playing sample: ${sampleId}${isUserSample ? ' (user uploaded)' : ''}`);
+    // Apply linear ramp for decay.
+    // It's important that the ramp doesn't try to go to 0 faster than the node can process.
+    gainNode.gain.linearRampToValueAtTime(0.0001, context.currentTime + decayTime);
+
+
+    source.connect(gainNode).connect(context.destination);
     
-    try {
-      // Different handling for user samples vs built-in samples
-      if (isUserSample) {
-        console.log(`Playing user sample: ${sampleId} with settings - volume:${volume}, pitch:${pitch}, decay:${decay}`);
-        
-        // For user samples, create a new player to apply fresh settings each time
-        // This solves the issue with sliders not responding for user samples
-        try {
-          // Stop any currently playing instance
-          if (player.state === 'started') {
-            try {
-              player.stop();
-            } catch (e) {
-              // Ignore errors when stopping
-            }
-          }
-          
-          // Create a new player clone with the same buffer but new settings
-          const playerClone = new Tone.Player({
-            url: player.buffer,
-            loop: false,
-            volume: volume,
-            playbackRate: Math.pow(2, pitch / 12), // Convert semitones to playback rate
-          }).toDestination();
-          
-          // Log the settings being applied
-          console.log(`Applied settings to user sample: vol=${volume}dB, pitch=${pitch}st, decay=${decay}s`);
-          
-          // Play the sample
-          const now = Tone.now();
-          playerClone.start(now);
-          playerClone.stop(now + decay);
-          
-          // Clean up the clone after playback
-          playerClone.onstop = () => {
-            setTimeout(() => {
-              try {
-                playerClone.dispose();
-              } catch (disposeError) {
-                // Ignore dispose errors
-              }
-            }, 200);
-          };
-        } catch (playError) {
-          console.error(`Error playing user sample: ${playError}`);
-        }
-      } else {
-        // For built-in samples, use the clone approach which works well
-        const playerClone = new Tone.Player({
-          url: player.buffer,
-          loop: false,
-          volume: volume,
-          playbackRate: Math.pow(2, pitch / 12), // Convert semitones to playback rate
-        }).toDestination();
-        
-        // Play the sample
-        const now = Tone.now();
-        playerClone.start(now);
-        
-        // Apply decay (release the sample after decay time)
-        playerClone.stop(now + decay);
-        
-        // Clean up the clone after playback
-        playerClone.onstop = () => {
-          setTimeout(() => {
-            try {
-              playerClone.dispose();
-              console.log(`Disposed player for ${sampleId}`);
-            } catch (disposeError) {
-              console.warn(`Error disposing player for ${sampleId}:`, disposeError);
-            }
-          }, 200);
-        };
-      }
-    } catch (playbackError) {
-      console.error(`Error in playback for sample ${sampleId}:`, playbackError);
-    }
-  } catch (error) {
-    console.error(`Error preparing sample ${sampleId}:`, error);
+    const playbackRate = Math.pow(2, pitch / 12);
+    source.playbackRate.setValueAtTime(playbackRate, context.currentTime);
+
+    source.start(context.currentTime);
+    // Stop the source after the effective duration + decay, plus a small safety margin.
+    // This is crucial for freeing up resources.
+    const stopTime = context.currentTime + effectiveBufferDuration + decayTime + 0.1;
+    source.stop(stopTime);
+
+    // Optional: Clean up nodes after they are surely finished
+    // This is tricky with BufferSourceNode as it can't be reused.
+    // GainNode could be reused if managed in a pool.
+    // For simplicity, let them be garbage collected after they stop.
+    // source.onended = () => {
+    //   source.disconnect();
+    //   gainNode.disconnect();
+    // };
+
+  } else {
+    console.warn(`Sample ID "${sampleId}" not found in loadedSamples or slicedBufferCache, or not loaded yet.`);
   }
 };
 
 // Schedule a sample to play at a specific time with improved handling and sequence timing protection
 export const scheduleSample = (
   sampleId: string,
-  time: number,
+  time: number, // This is Tone.Transport time or AudioContext time for scheduling
   volume: number = 0,
   pitch: number = 0,
   decay: number = 1
 ): void => {
-  if (!sampleId || !loadedSamples.has(sampleId)) {
-    // Silently fail for sequencer
-    return;
+  let bufferToPlay: AudioBuffer | undefined;
+
+  if (slicedBufferCache.has(sampleId)) {
+      bufferToPlay = slicedBufferCache.get(sampleId);
+  } else {
+      const player = loadedSamples.get(sampleId);
+      if (player && player.loaded) {
+          bufferToPlay = player.buffer.get() as AudioBuffer;
+      }
   }
 
-  try {
-    // Safety check to prevent scheduling in the past
-    const now = Tone.now();
-    if (time < now) {
-      time = now + 0.01; // Small offset to prevent errors
-    }
-    
-    const player = loadedSamples.get(sampleId)!;
-    const isUserSample = sampleId.startsWith('user-');
-    
-    // Create a new player with the buffer and fresh settings
-    // This approach works for both user samples and built-in samples
-    const tempPlayer = new Tone.Player({
-      url: player.buffer,
-      volume: volume,
-      playbackRate: Math.pow(2, pitch / 12), // Convert semitones to playback rate
-    }).toDestination();
-    
-    // Schedule the sample
-    tempPlayer.start(time);
-    tempPlayer.stop(time + decay);
-    
-    // Clean up after playback
-    tempPlayer.onstop = () => {
-      setTimeout(() => {
-        tempPlayer.dispose();
-      }, 200);
-    };
-  } catch (error) {
-    console.error(`Error scheduling sample ${sampleId}:`, error);
+  if (bufferToPlay) {
+      const context = getAudioContext(); // Ensure context is available
+      
+      // Safety check for scheduling time if using AudioContext.currentTime
+      // If 'time' is from Tone.Transport, it's already managed.
+      const scheduleTime = Math.max(context.currentTime, time);
+
+      const source = context.createBufferSource();
+      source.buffer = bufferToPlay;
+
+      const gainNode = context.createGain();
+      gainNode.gain.setValueAtTime(Tone.dbToGain(volume), scheduleTime);
+      
+      const effectiveBufferDuration = bufferToPlay.duration / (Math.pow(2, pitch / 12) || 1);
+      const decayTime = Math.max(0.01, Math.min(effectiveBufferDuration, decay));
+      gainNode.gain.linearRampToValueAtTime(0.0001, scheduleTime + decayTime);
+
+      source.connect(gainNode).connect(context.destination);
+      
+      const playbackRate = Math.pow(2, pitch / 12);
+      source.playbackRate.setValueAtTime(playbackRate, scheduleTime);
+      
+      source.start(scheduleTime);
+      const stopTime = scheduleTime + effectiveBufferDuration + decayTime + 0.1;
+      source.stop(stopTime);
+
+      // source.onended = () => {
+      //   source.disconnect();
+      //   gainNode.disconnect();
+      // };
+  } else {
+      // This can be noisy if samples aren't loaded yet during sequencer startup
+      // console.warn(`Scheduled sample ID "${sampleId}" not found or not loaded.`);
   }
 };
 
@@ -644,6 +569,7 @@ const audioEngine = {
   setSwing,
   toggleMetronome,
   loadUserSample,
+  addSlicedBuffer, // Export the new function
   // Add MIDI functions to the exported engine
   startMidiRecording,
   stopMidiRecording,
@@ -677,3 +603,18 @@ if (typeof window !== 'undefined') {
 }
 
 export default audioEngine;
+
+export const getAudioContext = (): AudioContext => {
+  if (!Tone.context || !Tone.context.rawContext) {
+    console.warn("Tone.js context not available. Attempting to start Tone if not already started by user gesture.");
+    // Tone.start() should ideally be called once upon user interaction.
+    // Calling it here might be too late or fail if no user gesture has occurred.
+    // A robust app structure ensures Tone is started early.
+    // For this subtask, we'll assume Tone.context is available or throw if not.
+    if (Tone.context && Tone.context.rawContext) {
+       return Tone.context.rawContext as AudioContext;
+    }
+    throw new Error("Tone.js AudioContext not available. Ensure audio is initialized via user interaction.");
+  }
+  return Tone.context.rawContext as AudioContext;
+};
