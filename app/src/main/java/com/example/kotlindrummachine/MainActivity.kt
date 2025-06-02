@@ -19,7 +19,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.activity.viewModels
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.lifecycle.ViewModel
+// import androidx.lifecycle.ViewModel // Will be replaced by specific import
 import android.app.Application
 import androidx.lifecycle.ViewModelProvider
 import androidx.compose.material.Button
@@ -42,6 +42,15 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.asSharedFlow // For Preview uiEvents
 import java.util.UUID
+import androidx.lifecycle.ViewModel // Specific import
+import androidx.lifecycle.viewModelScope // For this.viewModelScope
+import kotlinx.coroutines.flow.StateFlow // Ensure this is present
+import kotlinx.coroutines.flow.combine // Ensure this is present
+import kotlinx.coroutines.flow.mapLatest // Ensure this is present
+import kotlinx.coroutines.flow.SharingStarted // Ensure this is present
+import kotlinx.coroutines.launch // Ensure this is present for viewModelScope.launch
+// PadSettings is likely in DataModels.kt, assuming it's available in the package
+// import com.example.kotlindrummachine.PadSettings // Already available due to package structure or other imports
 
 
 // Custom ViewModel Factory for AndroidViewModel
@@ -163,6 +172,12 @@ fun DrumMachineApp(
     val editingPad = remember { mutableStateOf<Pad?>(null) }
     val showSampleSelectDialog = remember { mutableStateOf(false) }
     val context = LocalContext.current
+
+    // Hoisted state for various dialogs related to pattern management
+    val showRenameDialog = rememberSaveable { mutableStateOf(false) }
+    val renameText = rememberSaveable { mutableStateOf("") }
+    val showClearPatternDialog = rememberSaveable { mutableStateOf(false) }
+    val showDeleteDialog = rememberSaveable { mutableStateOf(false) }
 
     LaunchedEffect(key1 = viewModel.uiEvents) {
         viewModel.uiEvents.collect { message ->
@@ -310,7 +325,7 @@ fun DrumMachineApp(
                 Text("Active Kit: $activeKitName", style = MaterialTheme.typography.subtitle1, modifier = Modifier.weight(1f))
                 val showSaveKitDialog = rememberSaveable { mutableStateOf(false) }
                 val newKitName = rememberSaveable { mutableStateOf("") }
-                Button(onClick = { showSaveKitDialog.value = true }) { Text("Save Kit") }
+                Button(onClick = { showSaveKitDialog.value = true }, content = { Text("Save Kit") })
 
                 if (showSaveKitDialog.value) {
                     AlertDialog(
@@ -329,10 +344,16 @@ fun DrumMachineApp(
                                 onClick = {
                                     viewModel.saveCurrentAssignmentsAsKit(newKitName.value.ifBlank { "Untitled Kit" })
                                     showSaveKitDialog.value = false
-                                }
-                            ) { Text("Save") }
+                                },
+                                content = { Text("Save") }
+                            )
                         },
-                        dismissButton = { Button(onClick = { showSaveKitDialog.value = false }) { Text("Cancel") } }
+                        dismissButton = {
+                            Button(
+                                onClick = { showSaveKitDialog.value = false },
+                                content = { Text("Cancel") }
+                            )
+                        }
                     )
                 }
             }
@@ -349,8 +370,9 @@ fun DrumMachineApp(
                             if (currentIndex > 0) viewModel.selectKit(kits[currentIndex - 1].id)
                         }
                     },
-                    enabled = kits.indexOfFirst { it.id == activeKitId } > 0
-                ) { Text("< Kit") }
+                    enabled = kits.indexOfFirst { it.id == activeKitId } > 0,
+                    content = { Text("< Kit") }
+                )
                 Spacer(modifier = Modifier.width(8.dp))
                 TextButton(
                     onClick = {
@@ -359,8 +381,9 @@ fun DrumMachineApp(
                             if (currentIndex < kits.size - 1) viewModel.selectKit(kits[currentIndex + 1].id)
                         }
                     },
-                    enabled = kits.indexOfFirst { it.id == activeKitId } < kits.size - 1 && kits.isNotEmpty()
-                ) { Text("Kit >") }
+                    enabled = kits.indexOfFirst { it.id == activeKitId } < kits.size - 1 && kits.isNotEmpty(),
+                    content = { Text("Kit >") }
+                )
             }
 
 
@@ -385,47 +408,58 @@ fun DrumMachineApp(
                             if (currentIndex > 0) viewModel.selectPattern(allPatterns[currentIndex - 1].id)
                         }
                     },
-                    enabled = (allPatterns.indexOfFirst { it.id == currentPattern?.id } > 0)
-                ) { Text("< Prev") }
+                    enabled = (allPatterns.indexOfFirst { it.id == currentPattern?.id } > 0),
+                    content = { Text("< Prev") }
+                )
 
                 // Rename Button
-                val showRenameDialog = rememberSaveable { mutableStateOf(false) }
-                val renameText = rememberSaveable { mutableStateOf("") }
-                Button(onClick = {
-                    currentPattern?.let {
-                        renameText.value = it.name
-                        showRenameDialog.value = true
-                    }
-                }, enabled = currentPattern != null) { Text("Rename") }
+                Button(
+                    onClick = {
+                        currentPattern?.let {
+                            renameText.value = it.name
+                            showRenameDialog.value = true
+                        }
+                    },
+                    enabled = currentPattern != null,
+                    content = { Text("Rename") }
+                )
 
                 // New Pattern Button
                 TextButton(
-                    onClick = { viewModel.createNewPattern() }
-                ) { Text("New") }
+                    onClick = { viewModel.createNewPattern() },
+                    content = { Text("New") }
+                )
 
                 // Clear Pattern Button
-                val showClearPatternDialog = rememberSaveable { mutableStateOf(false) }
-                Button(onClick = {
-                    if (currentPattern != null) showClearPatternDialog.value = true
-                }, enabled = currentPattern != null) { Text("Clear") }
+                Button(
+                    onClick = {
+                        if (currentPattern != null) showClearPatternDialog.value = true
+                    },
+                    enabled = currentPattern != null,
+                    content = { Text("Clear") }
+                )
 
 
                 // Delete Button
-                val showDeleteDialog = rememberSaveable { mutableStateOf(false) }
-                Button(onClick = {
-                    if (currentPattern != null) showDeleteDialog.value = true
-                }, enabled = currentPattern != null) { Text("Delete") }
+                Button(
+                    onClick = {
+                        if (currentPattern != null) showDeleteDialog.value = true
+                    },
+                    enabled = currentPattern != null,
+                    content = { Text("Delete") }
+                )
 
                 // Next Pattern Button
                 TextButton(
-                        onClick = {
-                            currentPattern?.let { cp ->
-                                val currentIndex = allPatterns.indexOfFirst { it.id == cp.id }
-                                if (currentIndex < allPatterns.size - 1) viewModel.selectPattern(allPatterns[currentIndex + 1].id)
-                            }
-                        },
-                        enabled = (allPatterns.indexOfFirst { it.id == currentPattern?.id } < allPatterns.size - 1 && allPatterns.isNotEmpty())
-                    ) { Text("Next >") }
+                    onClick = {
+                        currentPattern?.let { cp ->
+                            val currentIndex = allPatterns.indexOfFirst { it.id == cp.id }
+                            if (currentIndex < allPatterns.size - 1) viewModel.selectPattern(allPatterns[currentIndex + 1].id)
+                        }
+                    },
+                    enabled = (allPatterns.indexOfFirst { it.id == currentPattern?.id } < allPatterns.size - 1 && allPatterns.isNotEmpty()),
+                    content = { Text("Next >") }
+                )
             }
 
             // Rename Dialog
@@ -435,9 +469,17 @@ fun DrumMachineApp(
                     title = { Text("Rename Pattern") },
                     text = { TextField(value = renameText.value, onValueChange = { renameText.value = it }, singleLine = true) },
                     confirmButton = {
-                        Button(onClick = { currentPattern?.let { viewModel.renamePattern(it.id, renameText.value) }; showRenameDialog.value = false }) { Text("Rename") }
+                        Button(
+                            onClick = { currentPattern?.let { viewModel.renamePattern(it.id, renameText.value) }; showRenameDialog.value = false },
+                            content = { Text("Rename") }
+                        )
                     },
-                    dismissButton = { Button(onClick = { showRenameDialog.value = false }) { Text("Cancel") } }
+                    dismissButton = {
+                        Button(
+                            onClick = { showRenameDialog.value = false },
+                            content = { Text("Cancel") }
+                        )
+                    }
                 )
             }
 
@@ -448,9 +490,17 @@ fun DrumMachineApp(
                     title = { Text("Confirm Delete") },
                     text = { Text("Are you sure you want to delete '${currentPattern?.name}'?") },
                     confirmButton = {
-                        Button(onClick = { currentPattern?.let { viewModel.deletePattern(it.id) }; showDeleteDialog.value = false }) { Text("Delete") }
+                        Button(
+                            onClick = { currentPattern?.let { viewModel.deletePattern(it.id) }; showDeleteDialog.value = false },
+                            content = { Text("Delete") }
+                        )
                     },
-                    dismissButton = { Button(onClick = { showDeleteDialog.value = false }) { Text("Cancel") } }
+                    dismissButton = {
+                        Button(
+                            onClick = { showDeleteDialog.value = false },
+                            content = { Text("Cancel") }
+                        )
+                    }
                 )
             }
 
@@ -461,9 +511,17 @@ fun DrumMachineApp(
                     title = { Text("Confirm Clear Pattern") },
                     text = { Text("Are you sure you want to clear all notes in '${currentPattern?.name ?: "this pattern"}'?") },
                     confirmButton = {
-                        Button(onClick = { viewModel.clearCurrentPattern(); showClearPatternDialog.value = false }) { Text("Clear") }
+                        Button(
+                            onClick = { viewModel.clearCurrentPattern(); showClearPatternDialog.value = false },
+                            content = { Text("Clear") }
+                        )
                     },
-                    dismissButton = { Button(onClick = { showClearPatternDialog.value = false }) { Text("Cancel") } }
+                    dismissButton = {
+                        Button(
+                            onClick = { showClearPatternDialog.value = false },
+                            content = { Text("Cancel") }
+                        )
+                    }
                 )
             }
 
@@ -556,90 +614,128 @@ fun DrumMachineApp(
 @Preview(showBackground = true)
 @Composable
 fun DefaultPreview() {
-    val context = androidx.compose.ui.platform.LocalContext.current
+    val context = LocalContext.current
+    val application = context.applicationContext as Application
     val previewAudioPlayer = AudioPlayer(context)
 
-    class PreviewDrumMachineViewModel(audioPlayer: AudioPlayer) : ViewModel() {
+    class PreviewDrumMachineViewModel(application: Application, audioPlayer: AudioPlayer) : DrumMachineViewModel(application, audioPlayer) {
+        // Properties: These are re-declared (hiding base class's) for the preview's distinct state. No 'override'.
         val pads = MutableStateFlow(List(16) { Pad(it, null) }.apply { find {it.id == 0}?.sampleId = "kick"; find {it.id == 1}?.sampleId = "snare" }).asStateFlow()
         val isPlaying = MutableStateFlow(false).asStateFlow()
         val isRecording = MutableStateFlow(false).asStateFlow()
         val currentStepIndex = MutableStateFlow(0).asStateFlow()
 
-        private val _initialPatterns = listOf(Pattern(1, "Pattern 1", listOf(
-            Track(0, steps = List(DrumMachineViewModel.NUM_STEPS){ it % 4 == 0}),
-            Track(1, steps = List(DrumMachineViewModel.NUM_STEPS){(it + 2) % 4 == 0 })
+        private val _initialPatterns_preview = listOf(Pattern(1, "Pattern 1", listOf(
+            Track(0, steps = List(NUM_STEPS){ it % 4 == 0}), // NUM_STEPS is from DrumMachineViewModel companion
+            Track(1, steps = List(NUM_STEPS){(it + 2) % 4 == 0 })
         )))
-        private val _patterns = MutableStateFlow(_initialPatterns)
-        val patterns = _patterns.asStateFlow()
-        private val _currentPatternId = MutableStateFlow<Int?>(_initialPatterns.firstOrNull()?.id)
-        val currentPatternId = _currentPatternId.asStateFlow()
+        private val _patterns_preview = MutableStateFlow(_initialPatterns_preview)
+        val patterns = _patterns_preview.asStateFlow() // Hides DrumMachineViewModel.patterns
+
+        private val _currentPatternId_preview = MutableStateFlow<Int?>(_initialPatterns_preview.firstOrNull()?.id)
+        val currentPatternId = _currentPatternId_preview.asStateFlow() // Hides DrumMachineViewModel.currentPatternId
+
+        // This uses the local 'patterns' and 'currentPatternId' which are the preview versions.
         val currentPattern: StateFlow<Pattern?> = combine(patterns, currentPatternId) { patternList, currentId ->
             patternList.find { it.id == currentId }
-        }.stateIn(viewModelScope, SharingStarted.Lazily, _initialPatterns.firstOrNull())
+        }.stateIn(this.viewModelScope, SharingStarted.Lazily, _initialPatterns_preview.firstOrNull()) // Hides
 
-        val tempo = MutableStateFlow(120).asStateFlow()
-        val samples = MutableStateFlow(listOf(Sample("kick", "Kick", 0), Sample("snare", "Snare", 1))).asStateFlow()
+        val tempo = MutableStateFlow(120).asStateFlow() // Hides
+        val samples = MutableStateFlow(listOf(Sample("kick", "Kick", 0), Sample("snare", "Snare", 1))).asStateFlow() // Hides
 
-        // Kit related states for preview
-        private val _defaultKit = DrumKit("default_kit_id", "Default Kit", mapOf(0 to "kick", 1 to "snare"))
-        private val _kits = MutableStateFlow(listOf(_defaultKit))
-        val kits = _kits.asStateFlow()
-        private val _activeKitId = MutableStateFlow<String?>(_defaultKit.id)
-        val activeKitId = _activeKitId.asStateFlow()
+        private val _defaultKit_preview = DrumKit(
+            "default_kit_id_preview", "Default Kit Preview",
+            mapOf(0 to PadSettings(sampleId = "kick"), 1 to PadSettings(sampleId = "snare"))
+        )
+        private val _kits_preview = MutableStateFlow(listOf(_defaultKit_preview))
+        val kits = _kits_preview.asStateFlow() // Hides
+
+        private val _activeKitId_preview = MutableStateFlow<String?>(_defaultKit_preview.id)
+        val activeKitId = _activeKitId_preview.asStateFlow() // Hides
+
         val activeKitName: StateFlow<String> = combine(kits, activeKitId) { kitList, currentId ->
              kitList.find { it.id == currentId }?.name ?: "No Kit Selected"
-        }.stateIn(viewModelScope, SharingStarted.Lazily, "No Kit Selected")
+        }.stateIn(this.viewModelScope, SharingStarted.Lazily, "No Kit Selected") // Hides
 
 
-        fun startPlayback() {}
-        fun stopPlayback() {}
-        fun toggleStep(padId: Int, stepIndex: Int) {}
-        fun toggleRecording() {}
-        fun recordPadTap(padId: Int) {}
-        fun createNewPattern() { /* ... */ }
-        fun selectPattern(patternId: Int) { _currentPatternId.value = patternId }
-        fun setTempo(newTempo: Int) {}
-        fun renamePattern(patternId: Int, newName: String) { /* ... */ }
-        fun deletePattern(patternId: Int) { /* ... */ }
-        fun selectKit(kitId: String) { _activeKitId.value = kitId }
-        fun saveCurrentAssignmentsAsKit(kitName: String) { /* ... */ }
-        fun assignSampleToPad(padId: Int, sampleId: String?) { /* ... */ }
-        fun setPadVolume(padId: Int, volume: Float) { /* ... */ }
-        fun setPadPitch(padId: Int, pitch: Float) { /* ... */ }
-        fun toggleMetronome() { _isMetronomeEnabled.value = !_isMetronomeEnabled.value }
-        fun setMetronomeVolume(vol: Float) { _metronomeVolume.value = vol }
-
-        private val _isMetronomeEnabled = MutableStateFlow(false)
-        val isMetronomeEnabled = _isMetronomeEnabled.asStateFlow()
-        private val _metronomeVolume = MutableStateFlow(0.75f)
-        val metronomeVolume = _metronomeVolume.asStateFlow()
-
-        // 16 Levels Preview States & Functions
-        private val _is16LevelsModeActive = MutableStateFlow(false)
-        val is16LevelsModeActive = _is16LevelsModeActive.asStateFlow()
-        private val _levelsSourcePadId = MutableStateFlow<Int?>(null)
-        val levelsSourcePadId = _levelsSourcePadId.asStateFlow()
-        private val _isSelectingLevelsSourcePad = MutableStateFlow(false)
-        val isSelectingLevelsSourcePad = _isSelectingLevelsSourcePad.asStateFlow()
-
-        fun toggle16LevelsMode() { _is16LevelsModeActive.value = !_is16LevelsModeActive.value }
-        fun startSelectingLevelsSourcePad() { _isSelectingLevelsSourcePad.value = true }
-        fun setLevelsSourcePad(padId: Int) {
-            if (pads.value.find{ it.id == padId }?.sampleId != null) {
-                _levelsSourcePadId.value = padId
-                viewModelScope.launch { _uiEvents.emit("Pad $padId set as 16 Levels source") }
-            } else {
-                viewModelScope.launch { _uiEvents.emit("Pad $padId has no sample") }
-            }
-            _isSelectingLevelsSourcePad.value = false
+        // --- Methods: Mark with 'override' ---
+        override fun startPlayback() { /* Custom preview logic or remove if base is OK */ }
+        override fun stopPlayback() { /* Custom preview logic */ }
+        override fun toggleStep(padId: Int, stepIndex: Int) { /* Custom preview logic */ }
+        override fun toggleRecording() { /* Custom preview logic */ }
+        override fun recordPadTap(padId: Int) { /* Custom preview logic */ }
+        override fun createNewPattern() {
+            val newId = (_patterns_preview.value.maxOfOrNull { it.id } ?: 0) + 1
+            val newPattern = Pattern(newId, "Pattern $newId", emptyList())
+            _patterns_preview.value += newPattern
+            _currentPatternId_preview.value = newId
+            // super.createNewPattern() // Or call super if appropriate
         }
-        fun clearCurrentPattern() { /* ... */ }
+        override fun selectPattern(patternId: Int) { _currentPatternId_preview.value = patternId }
+        override fun setTempo(newTempo: Int) { /* Custom preview logic */ } // tempo.value = newTempo if tempo is Mutable
+        override fun renamePattern(patternId: Int, newName: String) {
+             _patterns_preview.value = _patterns_preview.value.map {
+                if (it.id == patternId) it.copy(name = newName) else it
+            }
+        }
+        override fun deletePattern(patternId: Int) {
+            _patterns_preview.value = _patterns_preview.value.filterNot { it.id == patternId }
+            if (_currentPatternId_preview.value == patternId) {
+                _currentPatternId_preview.value = _patterns_preview.value.firstOrNull()?.id
+            }
+        }
+        override fun selectKit(kitId: String) { _activeKitId_preview.value = kitId }
+        override fun saveCurrentAssignmentsAsKit(kitName: String) { /* Custom preview logic for kits_preview */ }
+        override fun assignSampleToPad(padId: Int, sampleId: String?) { /* Custom preview logic for pads.value */ }
+        override fun setPadVolume(padId: Int, volume: Float) { /* Custom preview logic */ }
+        override fun setPadPitch(padId: Int, pitch: Float) { /* Custom preview logic */ }
 
-        val canSetSourcePad = pads.mapLatest { padList -> padList.any { it.sampleId != null } }.stateIn(viewModelScope, SharingStarted.Lazily, false)
-        private val _uiEvents = MutableSharedFlow<String>()
-        val uiEvents = _uiEvents.asSharedFlow()
+        // Metronome related states and methods (hiding and overriding)
+        private val _isMetronomeEnabled_preview = MutableStateFlow(false)
+        val isMetronomeEnabled = _isMetronomeEnabled_preview.asStateFlow() // Hides
+        override fun toggleMetronome() { _isMetronomeEnabled_preview.value = !_isMetronomeEnabled_preview.value }
+
+        private val _metronomeVolume_preview = MutableStateFlow(0.75f)
+        val metronomeVolume = _metronomeVolume_preview.asStateFlow() // Hides
+        override fun setMetronomeVolume(vol: Float) { _metronomeVolume_preview.value = vol.coerceIn(0f, 1f) }
+
+
+        // 16 Levels Preview States & Functions (hiding and overriding)
+        private val _is16LevelsModeActive_preview = MutableStateFlow(false)
+        val is16LevelsModeActive = _is16LevelsModeActive_preview.asStateFlow() // Hides
+
+        private val _levelsSourcePadId_preview = MutableStateFlow<Int?>(null)
+        val levelsSourcePadId = _levelsSourcePadId_preview.asStateFlow() // Hides
+
+        private val _isSelectingLevelsSourcePad_preview = MutableStateFlow(false)
+        val isSelectingLevelsSourcePad = _isSelectingLevelsSourcePad_preview.asStateFlow() // Hides
+        
+        val canSetSourcePad = pads.mapLatest { padList -> padList.any { it.sampleId != null } }.stateIn(this.viewModelScope, SharingStarted.Lazily, false) // Hides
+
+        private val _uiEvents_preview = MutableSharedFlow<String>()
+        val uiEvents = _uiEvents_preview.asSharedFlow() // Hides
+
+
+        override fun toggle16LevelsMode() { _is16LevelsModeActive_preview.value = !_is16LevelsModeActive_preview.value }
+        override fun startSelectingLevelsSourcePad() { _isSelectingLevelsSourcePad_preview.value = true }
+        override fun setLevelsSourcePad(padId: Int) {
+            if (pads.value.find{ it.id == padId }?.sampleId != null) { // using local pads
+                _levelsSourcePadId_preview.value = padId
+                this.viewModelScope.launch { _uiEvents_preview.emit("Pad $padId set as 16 Levels source") }
+            } else {
+                this.viewModelScope.launch { _uiEvents_preview.emit("Pad $padId has no sample") }
+            }
+            _isSelectingLevelsSourcePad_preview.value = false
+        }
+        override fun clearCurrentPattern() {
+            val currentId = _currentPatternId_preview.value ?: return
+            _patterns_preview.value = _patterns_preview.value.map {
+                if (it.id == currentId) it.copy(tracks = emptyList()) // Simplified clear
+                else it
+            }
+        }
     }
-    val previewViewModel = PreviewDrumMachineViewModel(previewAudioPlayer)
+    val previewViewModel = PreviewDrumMachineViewModel(application, previewAudioPlayer)
 
     KotlinDrumMachineTheme {
         DrumMachineApp(
