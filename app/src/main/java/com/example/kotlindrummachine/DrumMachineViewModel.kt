@@ -155,7 +155,7 @@ class DrumMachineViewModel(application: Application, private val audioPlayer: Au
                         padId // This key logic is wrong.
                     }
             // Corrected default kit padSettings map
-            val defaultPadSettingsMapCorrected = (0 until NUM_STEPS).associateWith { padId ->
+            );val defaultPadSettingsMapCorrected = (0 until NUM_STEPS).associateWith { padId ->
                  val sampleId = when (padId) {
                     0 -> "kick"; 1 -> "snare"; else -> null
                 }
