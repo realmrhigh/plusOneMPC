@@ -48,6 +48,7 @@ import kotlinx.coroutines.flow.StateFlow // Ensure this is present
 import kotlinx.coroutines.flow.combine // Ensure this is present
 import kotlinx.coroutines.flow.mapLatest // Ensure this is present
 import kotlinx.coroutines.flow.SharingStarted // Ensure this is present
+import kotlinx.coroutines.flow.stateIn // Added for stateIn
 import kotlinx.coroutines.launch // Ensure this is present for viewModelScope.launch
 // PadSettings is likely in DataModels.kt, assuming it's available in the package
 // import com.example.kotlindrummachine.PadSettings // Already available due to package structure or other imports
@@ -710,7 +711,7 @@ fun DefaultPreview() {
         private val _isSelectingLevelsSourcePad_preview = MutableStateFlow(false)
         override val isSelectingLevelsSourcePad = _isSelectingLevelsSourcePad_preview.asStateFlow() // Hides
         
-        override val canSetSourcePad = pads.mapLatest { padList -> padList.any { it.sampleId != null } }.stateIn(this.viewModelScope, SharingStarted.Lazily, false) // Hides
+        override val canSetSourcePad = pads.mapLatest { padList -> padList.any { it.sampleId != null } }.stateIn<Boolean>(this.viewModelScope, SharingStarted.Lazily, false) // Hides
 
         private val _uiEvents_preview = MutableSharedFlow<String>()
         override val uiEvents = _uiEvents_preview.asSharedFlow() // Hides

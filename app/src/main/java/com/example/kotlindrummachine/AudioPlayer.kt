@@ -4,6 +4,7 @@ import android.content.Context
 import android.media.AudioAttributes
 import android.media.SoundPool
 import android.util.Log
+import kotlin.math.pow
 
 class AudioPlayer(private val context: Context) {
 
