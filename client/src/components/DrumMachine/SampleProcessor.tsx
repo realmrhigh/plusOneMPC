@@ -1,9 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react'; // React import already present
 import { useDrumMachineStore } from '@/lib/stores/useDrumMachine';
-import { getSampleById, sampleLibrary } from '@/lib/samples';
-import { setupAudioContext } from '@/lib/audio';
-import { saveDrumKits } from '@/lib/persistence';
+import { getSampleById } from '@/lib/samples'; // sampleLibrary not needed directly here
+import audioEngine from '@/lib/audio'; // Import audioEngine for getSampleDuration
+// setupAudioContext might not be needed here if App.tsx handles global init
 import { Slider } from '@/components/ui/slider';
+import { Switch } from '@/components/ui/switch'; // Import Switch
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Sample } from '@/lib/types';
@@ -12,19 +14,22 @@ import {
   Music,
   Clock,
   Upload,
-  Loader2
+  Loader2,
+  Repeat,       // For Loop Toggle
+  TimerReset,   // For Sample Start/End
+  Settings2     // For Loop Start/End
 } from 'lucide-react';
 
 const SampleProcessor: React.FC = () => {
-  // Initialize all samples when component mounts
-  useEffect(() => {
-    console.log('Initializing audio context...');
-    async function initAudio() {
-      const audioContext = await setupAudioContext();
-      console.log('Audio context started');
-    }
-    initAudio();
-  }, []);
+  // useEffect for audio context init can be removed if App.tsx handles it globally
+  // useEffect(() => {
+  //   console.log('Initializing audio context...');
+  //   async function initAudio() {
+  //     // const audioContext = await setupAudioContext(); // setupAudioContext might not be needed
+  //     // console.log('Audio context started');
+  //   }
+  //   // initAudio();
+  // }, []);
   const {
     pads,
     processorSettings,
@@ -150,13 +155,40 @@ const SampleProcessor: React.FC = () => {
   const [localVolume, setLocalVolume] = useState<number>(currentSettings.volume);
   const [localPitch, setLocalPitch] = useState<number>(currentSettings.pitch);
   const [localDecay, setLocalDecay] = useState<number>(currentSettings.decay);
+  const [actualSampleDuration, setActualSampleDuration] = useState<number>(0);
+  const [localSampleStart, setLocalSampleStart] = useState<number>(0);
+  const [localSampleEnd, setLocalSampleEnd] = useState<number>(0);
+  const [localLoop, setLocalLoop] = useState<boolean>(false);
+  const [localLoopStart, setLocalLoopStart] = useState<number>(0);
+  const [localLoopEnd, setLocalLoopEnd] = useState<number>(0);
   
   // Update local state when current settings change (e.g., when selecting different pads)
   useEffect(() => {
     setLocalVolume(currentSettings.volume);
     setLocalPitch(currentSettings.pitch);
     setLocalDecay(currentSettings.decay);
-  }, [currentPadId, currentSettings]);
+
+    let fetchedDuration = 0;
+    if (currentPad && currentPad.sampleId) {
+        const duration = audioEngine.getSampleDuration(currentPad.sampleId);
+        if (duration !== null) fetchedDuration = duration;
+    }
+    setActualSampleDuration(fetchedDuration);
+
+    const currentSampleStart = currentSettings.sampleStart ?? 0;
+    const currentSampleEnd = currentSettings.sampleEnd ?? fetchedDuration; 
+    
+    setLocalSampleStart(currentSampleStart);
+    setLocalSampleEnd(currentSampleEnd);
+    setLocalLoop(currentSettings.loop ?? false);
+    
+    const currentLoopStart = currentSettings.loopStart ?? currentSampleStart;
+    const currentLoopEnd = currentSettings.loopEnd ?? currentSampleEnd;
+
+    setLocalLoopStart(Math.min(currentLoopStart, currentLoopEnd));
+    setLocalLoopEnd(Math.max(currentLoopStart, currentLoopEnd));
+
+ }, [currentPadId, currentSettings, currentPad?.sampleId]);
   
   // Update settings handlers with local state
   const handleVolumeChange = (value: number[]) => {
@@ -184,6 +216,74 @@ const SampleProcessor: React.FC = () => {
       ...currentSettings,
       decay: newDecay
     });
+  };
+
+  const makeUpdate = (newValues: Partial<ProcessorSettings>) => {
+    updateProcessorSettings({
+        ...currentSettings, // existing settings (vol, pitch, decay)
+        sampleStart: localSampleStart,
+        sampleEnd: localSampleEnd,
+        loop: localLoop,
+        loopStart: localLoopStart,
+        loopEnd: localLoopEnd,
+        ...newValues, // Overwrite with the specific changes
+    });
+  };
+
+  const handleLoopToggle = (checked: boolean) => {
+      setLocalLoop(checked);
+      const start = localSampleStart;
+      const end = localSampleEnd > start ? localSampleEnd : actualSampleDuration;
+      makeUpdate({ 
+          loop: checked,
+          // When turning loop on, re-evaluate loop points if they were default or invalid
+          loopStart: checked && (localLoopStart < start || localLoopStart >= end) ? start : localLoopStart,
+          loopEnd: checked && (localLoopEnd <= start || localLoopEnd > end) ? end : localLoopEnd,
+       });
+  };
+
+  const handleSampleStartChange = (value: number[]) => {
+      const newStart = Math.min(value[0], localSampleEnd);
+      setLocalSampleStart(newStart);
+      const update: Partial<ProcessorSettings> = { sampleStart: newStart };
+      if (localLoop && localLoopStart < newStart) { // If loopStart was before new sampleStart
+           setLocalLoopStart(newStart);
+           update.loopStart = newStart;
+           if (localLoopEnd < newStart) { // If loopEnd also became invalid
+            setLocalLoopEnd(newStart);
+            update.loopEnd = newStart;
+           }
+      }
+      makeUpdate(update);
+  };
+
+  const handleSampleEndChange = (value: number[]) => {
+      const newEnd = Math.max(value[0], localSampleStart);
+      setLocalSampleEnd(newEnd);
+      const update: Partial<ProcessorSettings> = { sampleEnd: newEnd };
+      if (localLoop && localLoopEnd > newEnd) { // If loopEnd was after new sampleEnd
+          setLocalLoopEnd(newEnd);
+          update.loopEnd = newEnd;
+          if (localLoopStart > newEnd) { // If loopStart also became invalid
+            setLocalLoopStart(newEnd);
+            update.loopStart = newEnd;
+          }
+      }
+      makeUpdate(update);
+  };
+  
+  const handleLoopStartChange = (value: number[]) => {
+      // Ensure loopStart is not after sampleEnd and not after localLoopEnd
+      const newLoopStart = Math.min(value[0], localLoopEnd, localSampleEnd);
+      setLocalLoopStart(newLoopStart);
+      makeUpdate({ loopStart: newLoopStart });
+  };
+
+  const handleLoopEndChange = (value: number[]) => {
+      // Ensure loopEnd is not before sampleStart and not before localLoopStart
+      const newLoopEnd = Math.max(value[0], localLoopStart, localSampleStart);
+      setLocalLoopEnd(newLoopEnd);
+      makeUpdate({ loopEnd: newLoopEnd });
   };
   
   // Play the sample to hear changes
@@ -382,6 +482,95 @@ const SampleProcessor: React.FC = () => {
             disabled={!sample}
           />
         </div>
+
+        {/* Sample Start Slider */}
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <TimerReset className="h-4 w-4" />
+            <Label>Sample Start</Label>
+            <span className="ml-auto">{localSampleStart.toFixed(3)} s</span>
+          </div>
+          <Slider
+            value={[localSampleStart]}
+            min={0}
+            max={actualSampleDuration}
+            step={0.001}
+            onValueChange={handleSampleStartChange}
+            onValueCommit={() => playSample()}
+            disabled={!sample || actualSampleDuration === 0}
+          />
+        </div>
+
+        {/* Sample End Slider */}
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <TimerReset className="h-4 w-4" style={{ transform: 'scaleX(-1)' }} />
+            <Label>Sample End</Label>
+            <span className="ml-auto">{localSampleEnd.toFixed(3)} s</span>
+          </div>
+          <Slider
+            value={[localSampleEnd]}
+            min={0}
+            max={actualSampleDuration}
+            step={0.001}
+            onValueChange={handleSampleEndChange}
+            onValueCommit={() => playSample()}
+            disabled={!sample || actualSampleDuration === 0}
+          />
+        </div>
+
+        {/* Loop Toggle */}
+        <div className="flex items-center justify-between pt-2"> {/* Added pt-2 for spacing */}
+          <div className="flex items-center gap-2">
+            <Repeat className="h-4 w-4" />
+            <Label>Loop Sample</Label>
+          </div>
+          <Switch
+            checked={localLoop}
+            onCheckedChange={handleLoopToggle}
+            disabled={!sample || actualSampleDuration === 0}
+          />
+        </div>
+
+        {/* Loop Start Slider (conditional) */}
+        {localLoop && (
+          <div className="space-y-2 pl-4 border-l-2 border-red-700 ml-2 mr-2 py-2">
+            <div className="flex items-center gap-2">
+              <Settings2 className="h-4 w-4" />
+              <Label>Loop Start</Label>
+              <span className="ml-auto">{localLoopStart.toFixed(3)} s</span>
+            </div>
+            <Slider
+              value={[localLoopStart]}
+              min={0} 
+              max={actualSampleDuration} 
+              step={0.001}
+              onValueChange={handleLoopStartChange}
+              onValueCommit={() => playSample()}
+              disabled={!sample || actualSampleDuration === 0}
+            />
+          </div>
+        )}
+
+        {/* Loop End Slider (conditional) */}
+        {localLoop && (
+          <div className="space-y-2 pl-4 border-l-2 border-red-700 ml-2 mr-2 py-2">
+            <div className="flex items-center gap-2">
+              <Settings2 className="h-4 w-4" style={{ transform: 'scaleX(-1)' }} />
+              <Label>Loop End</Label>
+              <span className="ml-auto">{localLoopEnd.toFixed(3)} s</span>
+            </div>
+            <Slider
+              value={[localLoopEnd]}
+              min={0} 
+              max={actualSampleDuration}
+              step={0.001}
+              onValueChange={handleLoopEndChange}
+              onValueCommit={() => playSample()}
+              disabled={!sample || actualSampleDuration === 0}
+            />
+          </div>
+        )}
       </div>
       
       {/* MPC logo at the bottom */}

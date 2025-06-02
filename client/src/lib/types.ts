@@ -50,9 +50,14 @@ export interface DrumKit {
 // Sample processor settings
 export interface ProcessorSettings {
   padId: number;
-  volume: number;
-  pitch: number;
-  decay: number;
+  volume: number; // in dB
+  pitch: number;  // in semitones
+  decay: number;  // in seconds
+  sampleStart?: number; // Playback start time in seconds from the beginning of the buffer
+  sampleEnd?: number;   // Playback end time in seconds from the beginning of the buffer
+  loop?: boolean;       // Whether the sample should loop
+  loopStart?: number;   // Loop start time in seconds, relative to the beginning of the buffer
+  loopEnd?: number;     // Loop end time in seconds, relative to the beginning of the buffer
 }
 
 // Quantization values

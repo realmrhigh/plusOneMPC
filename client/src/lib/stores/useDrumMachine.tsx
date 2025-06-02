@@ -113,7 +113,13 @@ export const useDrumMachineStore = create<DrumMachineState>()(
           padId: pad.id,
           volume: 0,
           pitch: 0,
-          decay: 0.5
+          decay: 0.5,
+          // Add new defaults:
+          sampleStart: 0,
+          sampleEnd: undefined, // Will be set on sample load or remains undefined if no sample
+          loop: false,
+          loopStart: 0,
+          loopEnd: undefined,   // Will be set on sample load or remains undefined
         })),
       transport: {
         tempo: savedTempo || 90,
@@ -201,18 +207,21 @@ export const useDrumMachineStore = create<DrumMachineState>()(
                 const pad = pads.find(p => p.id === track.padId);
                 if (pad && pad.sampleId) {
                   // Get processing settings
-                  const settings = processorSettings.find(
-                    s => s.padId === pad.id
-                  ) || { volume: 0, pitch: 0, decay: 0.5 };
+                  const currentPadSettings = processorSettings.find(s => s.padId === pad.id);
                   
-                  // Schedule the sample to play
-                  audioEngine.scheduleSample(
-                    pad.sampleId,
-                    time,
-                    settings.volume,
-                    settings.pitch,
-                    settings.decay
-                  );
+                  if (currentPadSettings) {
+                    // Schedule the sample to play
+                    audioEngine.scheduleSample(
+                      pad.sampleId,
+                      time,
+                      currentPadSettings // Pass the whole settings object
+                    );
+                  } else {
+                    // Fallback or warning if settings not found, though this shouldn't happen
+                    // if processorSettings are always initialized for all pads.
+                    console.warn(`Sequencer: No settings found for pad ${pad.id}. Playing with defaults.`);
+                    // audioEngine.scheduleSample(pad.sampleId, time, { padId: pad.id, volume:0, pitch:0, decay:0.5, sampleStart:0, loop:false, loopStart:0 });
+                  }
                   
                   // Set active pad to light it up visually
                   // We do this in a timeout that syncs with the audio timing
@@ -336,19 +345,17 @@ export const useDrumMachineStore = create<DrumMachineState>()(
           }
           
           // Get processing settings
-          const settings = processorSettings.find(s => s.padId === padId) || {
-            volume: 0,
-            pitch: 0,
-            decay: 0.5
-          };
+          const settings = processorSettings.find(s => s.padId === padId);
           
-          // Play the sample
-          audioEngine.playSample(
-            pad.sampleId, 
-            settings.volume, 
-            settings.pitch, 
-            settings.decay
-          );
+          if (settings) {
+            // Play the sample
+            audioEngine.playSample(pad.sampleId, settings);
+          } else {
+            // Fallback or warning if settings not found
+            console.warn(`triggerPad: No settings found for pad ${padId}. Sample might not play correctly.`);
+            // As a minimal fallback, one might play with default parameters, but it's better to ensure settings exist.
+            // audioEngine.playSample(pad.sampleId, { padId: pad.id, volume:0, pitch:0, decay:0.5, sampleStart:0, loop:false, loopStart:0 });
+          }
           
           // Record to pattern if recording or overdubbing is active
           if ((isRecording || isOverdubbing) && transport.playing) {
@@ -528,42 +535,124 @@ export const useDrumMachineStore = create<DrumMachineState>()(
       
       // Set current drum kit
       setCurrentKit: (kitId: string) => {
-        const { kits, pads } = get();
+        const { kits, pads, processorSettings: currentProcessorSettings } = get();
         const kit = kits.find(k => k.id === kitId);
-        
+
         if (kit) {
-          // Update pad assignments based on kit
           const updatedPads = pads.map(pad => {
             const assignment = kit.assignments.find(a => a.padId === pad.id);
-            return {
-              ...pad,
-              sampleId: assignment ? assignment.sampleId : null
-            };
+            return { ...pad, sampleId: assignment ? assignment.sampleId : null };
           });
-          
+
+          let newProcessorSettings = [...currentProcessorSettings];
+          updatedPads.forEach(pad => {
+            const settingIndex = newProcessorSettings.findIndex(s => s.padId === pad.id);
+            let modifiableSettings: ProcessorSettings;
+
+            if (settingIndex !== -1) {
+              modifiableSettings = { ...newProcessorSettings[settingIndex] };
+            } else {
+              // If no settings exist for this pad, create default including new fields
+              modifiableSettings = {
+                padId: pad.id, volume: 0, pitch: 0, decay: 0.5,
+                sampleStart: 0, sampleEnd: undefined,
+                loop: false, loopStart: 0, loopEnd: undefined,
+              };
+            }
+            
+            if (pad.sampleId) {
+              const duration = audioEngine.getSampleDuration(pad.sampleId);
+              modifiableSettings = {
+                ...modifiableSettings, // Keep existing vol, pitch, decay unless kit specifies them
+                sampleStart: 0,
+                sampleEnd: duration ?? modifiableSettings.sampleEnd, // Use full duration, fallback to existing
+                loop: false,
+                loopStart: 0,
+                loopEnd: duration ?? modifiableSettings.loopEnd,   // Default loop end to sample end, fallback to existing
+              };
+            } else { // If no sample is assigned by the kit (pad becomes empty)
+              modifiableSettings = {
+                ...modifiableSettings,
+                sampleStart: 0,
+                sampleEnd: undefined,
+                loop: false,
+                loopStart: 0,
+                loopEnd: undefined,
+              };
+            }
+            
+            if (settingIndex !== -1) {
+              newProcessorSettings[settingIndex] = modifiableSettings;
+            } else {
+              // This should ideally be caught by ensuring all pads have initial settings
+              newProcessorSettings.push(modifiableSettings);
+            }
+          });
+
           set({
             currentKitId: kitId,
-            pads: updatedPads
+            pads: updatedPads,
+            processorSettings: newProcessorSettings,
           });
           
-          // Save to persistence
           persistence.saveCurrentKitId(kitId);
           persistence.savePads(updatedPads);
+          persistence.saveProcessorSettings(newProcessorSettings);
         }
       },
       
       // Assign a sample to a pad
       assignSampleToPad: (padId: number, sampleId: string | null) => {
-        // Update the pads state
         set(state => {
           const updatedPads = state.pads.map(pad => 
             pad.id === padId ? { ...pad, sampleId } : pad
           );
+
+          let updatedSettings = [...state.processorSettings];
+          const settingIndex = updatedSettings.findIndex(s => s.padId === padId);
+          // Ensure audioEngine.getSampleDuration is available
+          const duration = sampleId ? audioEngine.getSampleDuration(sampleId) : null;
+
+          if (settingIndex !== -1) {
+            const existingSettings = updatedSettings[settingIndex];
+            if (sampleId) {
+              updatedSettings[settingIndex] = {
+                ...existingSettings,
+                sampleStart: 0,
+                sampleEnd: duration ?? existingSettings.sampleEnd,
+                loop: false,
+                loopStart: 0,
+                loopEnd: duration ?? existingSettings.loopEnd,
+              };
+            } else {
+              // Sample is being cleared
+              updatedSettings[settingIndex] = {
+                ...existingSettings,
+                sampleStart: 0,
+                sampleEnd: undefined,
+                loop: false,
+                loopStart: 0,
+                loopEnd: undefined,
+              };
+            }
+          } else if (sampleId) { 
+            // This case should ideally not be hit if pads are always initialized with settings.
+            // But as a fallback, create new settings for the pad.
+            updatedSettings.push({
+              padId: padId,
+              volume: 0, pitch: 0, decay: 0.5, // Default other settings
+              sampleStart: 0,
+              sampleEnd: duration ?? undefined,
+              loop: false,
+              loopStart: 0,
+              loopEnd: duration ?? undefined,
+            });
+          }
           
-          // Save to persistence
           persistence.savePads(updatedPads);
-          
-          return { pads: updatedPads };
+          persistence.saveProcessorSettings(updatedSettings);
+
+          return { pads: updatedPads, processorSettings: updatedSettings };
         });
       },
       

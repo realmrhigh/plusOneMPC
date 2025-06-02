@@ -1,5 +1,5 @@
 import * as Tone from 'tone';
-import { Sample } from './types';
+import { Sample, ProcessorSettings } from './types'; // Import ProcessorSettings
 
 // Store loaded samples
 const loadedSamples: Map<string, Tone.Player> = new Map();
@@ -131,22 +131,15 @@ export const loadSample = async (sample: Sample): Promise<void> => {
 };
 
 // Play a sample with processing and improved handling for user samples
-export const playSample = (
-  sampleId: string, 
-  volume: number = 0, 
-  pitch: number = 0, 
-  decay: number = 1
-): void => {
+export const playSample = (sampleId: string, settings: ProcessorSettings): void => {
   let bufferToPlay: AudioBuffer | undefined;
 
   if (slicedBufferCache.has(sampleId)) {
     bufferToPlay = slicedBufferCache.get(sampleId);
-    // console.log(`Playing slice from slicedBufferCache: ${sampleId}`);
   } else {
     const player = loadedSamples.get(sampleId);
-    if (player && player.loaded) { // Check if Tone.Player is loaded
-      bufferToPlay = player.buffer.get() as AudioBuffer; // Get the AudioBuffer from Tone.Buffer
-      // console.log(`Playing sample from loadedSamples: ${sampleId}`);
+    if (player && player.loaded && player.buffer) {
+      bufferToPlay = player.buffer.get() as AudioBuffer; 
     }
   }
 
@@ -156,97 +149,140 @@ export const playSample = (
     source.buffer = bufferToPlay;
 
     const gainNode = context.createGain();
-    // Convert volume from dB to gain (0dB = 1, -Infinity dB = 0)
-    // Assuming 'volume' is in dB. If it's linear (0-1), Tone.dbToGain is not needed.
-    // For consistency with Tone.Player.volume which is in dB, we use dbToGain.
-    gainNode.gain.setValueAtTime(Tone.dbToGain(volume), context.currentTime);
+    gainNode.gain.setValueAtTime(Tone.dbToGain(settings.volume), context.currentTime);
     
-    // Ensure decay is positive and within buffer duration for linearRamp
-    const effectiveBufferDuration = bufferToPlay.duration / (Math.pow(2, pitch / 12) || 1); // Adjust duration by pitch
-    const decayTime = Math.max(0.01, Math.min(effectiveBufferDuration, decay));
-    
-    // Apply linear ramp for decay.
-    // It's important that the ramp doesn't try to go to 0 faster than the node can process.
-    gainNode.gain.linearRampToValueAtTime(0.0001, context.currentTime + decayTime);
-
-
     source.connect(gainNode).connect(context.destination);
+   
+    const playbackRate = Math.pow(2, settings.pitch / 12);
+    source.playbackRate.value = playbackRate;
+
+    const effectiveSampleStart = settings.sampleStart ?? 0;
+    // Ensure sampleEnd is not beyond buffer duration, and if undefined, use buffer duration
+    let effectiveSampleEnd = settings.sampleEnd ?? bufferToPlay.duration;
+    effectiveSampleEnd = Math.min(effectiveSampleEnd, bufferToPlay.duration);
+
+    // Ensure start is before end
+    if (effectiveSampleStart >= effectiveSampleEnd) {
+        console.warn("Sample start time is at or after end time. Not playing.");
+        return;
+    }
     
-    const playbackRate = Math.pow(2, pitch / 12);
-    source.playbackRate.setValueAtTime(playbackRate, context.currentTime);
+    let playDuration = (effectiveSampleEnd - effectiveSampleStart) / (playbackRate || 1);
+    if (playDuration < 0) playDuration = 0;
 
-    source.start(context.currentTime);
-    // Stop the source after the effective duration + decay, plus a small safety margin.
-    // This is crucial for freeing up resources.
-    const stopTime = context.currentTime + effectiveBufferDuration + decayTime + 0.1;
-    source.stop(stopTime);
+    if (settings.loop) {
+      source.loop = true;
+      const effectiveLoopStart = settings.loopStart ?? effectiveSampleStart;
+      const effectiveLoopEnd = settings.loopEnd ?? effectiveSampleEnd;
 
-    // Optional: Clean up nodes after they are surely finished
-    // This is tricky with BufferSourceNode as it can't be reused.
-    // GainNode could be reused if managed in a pool.
-    // For simplicity, let them be garbage collected after they stop.
-    // source.onended = () => {
-    //   source.disconnect();
-    //   gainNode.disconnect();
-    // };
+      source.loopStart = Math.max(0, effectiveLoopStart);
+      source.loopEnd = Math.min(bufferToPlay.duration, effectiveLoopEnd);
+      
+      if (source.loopStart >= source.loopEnd) {
+        source.loop = false; 
+        console.warn("Loop disabled: loopStart >= loopEnd. Playing as one-shot.");
+        // Play as one-shot if loop points invalid
+        const audibleDuration = Math.min(playDuration, settings.decay);
+        if (audibleDuration <= 0) { console.warn("Audible duration is zero for one-shot after loop disable."); return; }
+        gainNode.gain.linearRampToValueAtTime(0.0001, context.currentTime + audibleDuration);
+        source.start(context.currentTime, effectiveSampleStart, playDuration);
+        source.stop(context.currentTime + audibleDuration + 0.1);
+      } else {
+        source.start(context.currentTime, effectiveSampleStart); // Loop indefinitely from offset
+        // Looping sounds do not automatically decay or stop here; they need explicit stop handling (e.g., pad retrigger)
+      }
+    } else { // One-shot
+      source.loop = false;
+      const audibleDuration = Math.min(playDuration, settings.decay);
+      if (audibleDuration <= 0) { console.warn("Audible duration is zero for one-shot."); return; }
 
+      gainNode.gain.linearRampToValueAtTime(0.0001, context.currentTime + audibleDuration);
+      source.start(context.currentTime, effectiveSampleStart, playDuration); // Play the segment once
+      source.stop(context.currentTime + audibleDuration + 0.1); 
+    }
+    
   } else {
-    console.warn(`Sample ID "${sampleId}" not found in loadedSamples or slicedBufferCache, or not loaded yet.`);
+    console.warn(`Sample ID "${sampleId}" not found for immediate playback.`);
   }
 };
 
 // Schedule a sample to play at a specific time with improved handling and sequence timing protection
-export const scheduleSample = (
-  sampleId: string,
-  time: number, // This is Tone.Transport time or AudioContext time for scheduling
-  volume: number = 0,
-  pitch: number = 0,
-  decay: number = 1
-): void => {
-  let bufferToPlay: AudioBuffer | undefined;
+export const scheduleSample = (sampleId: string, time: number, settings: ProcessorSettings): void => {
+   let bufferToPlay: AudioBuffer | undefined;
 
-  if (slicedBufferCache.has(sampleId)) {
-      bufferToPlay = slicedBufferCache.get(sampleId);
-  } else {
-      const player = loadedSamples.get(sampleId);
-      if (player && player.loaded) {
-          bufferToPlay = player.buffer.get() as AudioBuffer;
-      }
-  }
+   if (slicedBufferCache.has(sampleId)) {
+       bufferToPlay = slicedBufferCache.get(sampleId);
+   } else {
+       const player = loadedSamples.get(sampleId);
+       if (player && player.loaded && player.buffer) {
+           bufferToPlay = player.buffer.get() as AudioBuffer;
+       }
+   }
 
-  if (bufferToPlay) {
-      const context = getAudioContext(); // Ensure context is available
-      
-      // Safety check for scheduling time if using AudioContext.currentTime
-      // If 'time' is from Tone.Transport, it's already managed.
-      const scheduleTime = Math.max(context.currentTime, time);
+   if (bufferToPlay) {
+       const context = getAudioContext();
+       const source = context.createBufferSource();
+       source.buffer = bufferToPlay;
 
-      const source = context.createBufferSource();
-      source.buffer = bufferToPlay;
+       const gainNode = context.createGain();
+       gainNode.gain.setValueAtTime(Tone.dbToGain(settings.volume), time);
 
-      const gainNode = context.createGain();
-      gainNode.gain.setValueAtTime(Tone.dbToGain(volume), scheduleTime);
-      
-      const effectiveBufferDuration = bufferToPlay.duration / (Math.pow(2, pitch / 12) || 1);
-      const decayTime = Math.max(0.01, Math.min(effectiveBufferDuration, decay));
-      gainNode.gain.linearRampToValueAtTime(0.0001, scheduleTime + decayTime);
+       source.connect(gainNode).connect(context.destination);
+       
+       const playbackRate = Math.pow(2, settings.pitch / 12);
+       source.playbackRate.value = playbackRate;
 
-      source.connect(gainNode).connect(context.destination);
-      
-      const playbackRate = Math.pow(2, pitch / 12);
-      source.playbackRate.setValueAtTime(playbackRate, scheduleTime);
-      
-      source.start(scheduleTime);
-      const stopTime = scheduleTime + effectiveBufferDuration + decayTime + 0.1;
-      source.stop(stopTime);
+       const effectiveSampleStart = settings.sampleStart ?? 0;
+       let effectiveSampleEnd = settings.sampleEnd ?? bufferToPlay.duration;
+       effectiveSampleEnd = Math.min(effectiveSampleEnd, bufferToPlay.duration);
 
-      // source.onended = () => {
-      //   source.disconnect();
-      //   gainNode.disconnect();
-      // };
-  } else {
-      // This can be noisy if samples aren't loaded yet during sequencer startup
-      // console.warn(`Scheduled sample ID "${sampleId}" not found or not loaded.`);
+       if (effectiveSampleStart >= effectiveSampleEnd) {
+           // console.warn(`Scheduled sample ${sampleId}: start time is at or after end time. Not playing.`); // Can be noisy
+           return;
+       }
+
+       let playDuration = (effectiveSampleEnd - effectiveSampleStart) / (playbackRate || 1);
+       if (playDuration < 0) playDuration = 0;
+
+       if (settings.loop) {
+           source.loop = true;
+           const effectiveLoopStart = settings.loopStart ?? effectiveSampleStart;
+           const effectiveLoopEnd = settings.loopEnd ?? effectiveSampleEnd;
+           source.loopStart = Math.max(0, effectiveLoopStart);
+           source.loopEnd = Math.min(bufferToPlay.duration, effectiveLoopEnd);
+
+           if (source.loopStart >= source.loopEnd) {
+               source.loop = false; // Play as one-shot if loop points invalid
+           }
+           
+           // For scheduled "loops", we play one iteration of the loop segment as a compromise.
+           // True sustained looping would require a note-off mechanism in the sequencer.
+           if(source.loop) {
+               let loopSegmentDuration = (source.loopEnd - source.loopStart) / (playbackRate || 1);
+               if (loopSegmentDuration <= 0) { // Should have been caught by loopStart >= loopEnd, but double check
+                  source.loop = false; // Fallback to one-shot logic
+               } else {
+                  source.start(time, source.loopStart, loopSegmentDuration); // Play one loop segment
+                  const audibleDuration = Math.min(loopSegmentDuration, settings.decay);
+                  if (audibleDuration <=0) { return; }
+                  gainNode.gain.linearRampToValueAtTime(0.0001, time + audibleDuration);
+                  source.stop(time + audibleDuration + 0.1);
+                  return; // Explicit return after handling scheduled loop segment
+               }
+           }
+       }
+       
+       // Fallthrough for one-shot (if loop was false initially, or became false due to invalid points)
+       source.loop = false;
+       const audibleDuration = Math.min(playDuration, settings.decay);
+       if (audibleDuration <=0) { /* console.warn(`Scheduled sample ${sampleId} audible duration is zero.`); */ return; }
+
+       gainNode.gain.linearRampToValueAtTime(0.0001, time + audibleDuration);
+       source.start(time, effectiveSampleStart, playDuration); // Play the segment once
+       source.stop(time + audibleDuration + 0.1);
+       
+   } else {
+       // console.warn(`Scheduled sample ID "${sampleId}" not found.`); // Can be noisy
   }
 };
 
@@ -559,6 +595,18 @@ export const loadUserSample = (sampleId: string, player: Tone.Player): void => {
 };
 
 // Export the audio engine functions for use in 16 Levels mode
+export const getSampleDuration = (sampleId: string): number | null => {
+  if (slicedBufferCache.has(sampleId)) {
+    return slicedBufferCache.get(sampleId)!.duration;
+  }
+  const player = loadedSamples.get(sampleId); // loadedSamples stores Tone.Player
+  if (player && player.loaded && player.buffer) { // Check player.buffer directly
+    return player.buffer.duration;
+  }
+  console.warn(`Duration not found for sampleId: ${sampleId}\`);
+  return null;
+};
+
 const audioEngine = {
   loadSample,
   playSample,
@@ -570,6 +618,7 @@ const audioEngine = {
   toggleMetronome,
   loadUserSample,
   addSlicedBuffer, // Export the new function
+  getSampleDuration, // Export new function
   // Add MIDI functions to the exported engine
   startMidiRecording,
   stopMidiRecording,
