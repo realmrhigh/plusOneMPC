@@ -1,11 +1,10 @@
-MPC Standalone OS v3.4 - Feature Map
-consult this for app design reference of future features
+Music Production App - Feature Map
 I. Project & File Management
 Projects:
 
-Create New Projects (with hardware-specific templates)
+Create New Projects (with app-specific templates)
 
-Load Existing Projects (including MPC2 projects with conversion options)
+Load Existing Projects (with potential for importing from common formats)
 
 Load Demo Projects
 
@@ -13,17 +12,17 @@ Save Projects
 
 Browser:
 
-Navigate Internal/External Storage (SATA, USB, SD Card)
+Navigate Internal Device Storage & External Storage (e.g., USB via USB-C, SD Card if applicable)
 
-View by: Places, Content Type (Drums, Instruments, Samples, etc.), Expansions
+View by: Location, Content Type (Drums, Instruments, Samples, etc.), Sound Packs/Expansions
 
 File Filtering (Project, Pattern, Kit, Plugin Preset, Sample) & Sorting
 
-File Operations: Load, Load All to Pool, Delete, Drive Info, Format Drive
+File Operations: Load, Load All to Pool, Delete, Storage Info, Format External Storage
 
-Sample Auditioning: Preview with Play, Auto-Play, Volume, Sync, Warp
+Sample Auditioning: Preview with Play, Auto-Play, Volume, Sync to Tempo, Warp
 
-Customizable Folder Shortcuts (1-5)
+Customizable Folder Shortcuts
 
 Browser Options: Configure display, search, and loading behaviors
 
@@ -31,9 +30,9 @@ Sample Pool:
 
 Manage all samples loaded into the current project
 
-Assign samples from Pool to Pads/Keygroups
+Assign samples from Pool to Virtual Pads/Keygroups
 
-Disk Streaming: Stream samples from disk or load fully into memory
+Disk Streaming: Stream samples from storage or load fully into memory
 
 Exporting:
 
@@ -43,13 +42,9 @@ Formats: WAV, AIFF, MP3, FLAC, OGG
 
 Options: Bit Depth, Sample Rate, Render Source (Outputs/Stems), Audio Tail
 
-Ableton Live Set Export (.als):
-
-Options: MIDI as Audio/MIDI, Include Volume/Pan, Bypass Effects, Audio Tail
-
 Sequence Export:
 
-Formats: MPC Pattern (.mpcpattern), MIDI File (.midi)
+Formats: Standard MIDI File (.mid), App-specific Pattern Format
 
 II. Sequencing & Arrangement
 Sequences:
@@ -74,15 +69,13 @@ Copy Sequence, Copy Bars, Copy Events (with Replace/Merge options)
 
 Track Types:
 
-Drum Tracks: Sample-based, 8 layers per pad
+Drum Tracks: Sample-based, multiple layers per virtual pad
 
-Keygroup Tracks: Pitched multi-samples, 8 layers per keygroup
+Keygroup Tracks: Pitched multi-samples, multiple layers per keygroup
 
 Plugin Tracks: Host internal instrument plugins
 
-MIDI Tracks: Sequence external MIDI hardware
-
-CV Tracks: Sequence analog CV/Gate hardware
+MIDI Tracks: Sequence external MIDI hardware/apps (via USB/Bluetooth)
 
 Audio Tracks: Record and play back linear audio
 
@@ -92,7 +85,7 @@ Track Operations:
 
 Naming, Selection, Type Change
 
-Monitoring: Off, In, Auto, Merge
+Monitoring: Off, In, Auto, Merge (for audio/MIDI inputs)
 
 Independent Track Length & Velocity Scaling
 
@@ -100,7 +93,7 @@ Track Transposition (MIDI-based)
 
 Duplicate Track (with/without events), Delete Track, Copy Track
 
-Drum Track Specific: Merge Pads/Tracks, Copy Pads, Explode Track, Edit Pad Note Map
+Drum Track Specific: Merge Pads/Tracks, Copy Pads, Explode Track to multiple tracks, Edit Virtual Pad Note Map
 
 Keygroup Track Specific: Merge Tracks
 
@@ -108,7 +101,7 @@ Recording:
 
 Real-time Recording:
 
-Into Arrangement View (Main Mode) or Linear Timeline (Arrange Mode)
+Into Arrangement View or Linear Timeline
 
 Overdubbing (manual or automatic)
 
@@ -118,7 +111,7 @@ Loop Recording
 
 Step Sequencing:
 
-Classic step-input for patterns
+Classic step-input for patterns on virtual pads/grid
 
 Velocity per step, various step sizes (time divisions)
 
@@ -136,7 +129,7 @@ Arrangement Editing: Clear, Double Length, Trim, Half/Double Speed (MIDI), Pitch
 
 Arrangement Track Editor: Integrated grid/automation editor
 
-User-definable Locator Markers (6)
+User-definable Locator Markers
 
 Event Editing:
 
@@ -144,7 +137,7 @@ Grid View:
 
 Piano roll (MIDI/Plugin/Keygroup) & Drum grid (Drum) & Audio region view (Audio)
 
-Tools: Pencil, Eraser, Select, Marquee, Scissors, Mute, Zoom
+Tools: Pencil, Eraser, Select, Marquee, Scissors, Mute, Zoom (on-screen gestures)
 
 Edit operations: Nudge, Edit Start/End, Transpose (MIDI), Split, Fade, Level, Reverse, Warp (Audio)
 
@@ -188,18 +181,18 @@ Convert Song to a single Sequence
 
 Next Sequence Mode:
 
-Trigger sequences live using pads
+Trigger sequences live using virtual pads or mapped MIDI controllers
 
 Transition options: Next Bar, Sudden, Hold
 
 III. Sampling & Sample Editing
 Sampler (Recording):
 
-Input Sources: External Line/Mic/Phono, Internal Resample (L/R/Stereo)
+Input Sources: External Audio (via USB-C audio interface, device microphone), Internal Resample (L/R/Stereo)
 
 Mono/Stereo Recording
 
-Input Monitoring (with zero-latency option)
+Input Monitoring (with low-latency option)
 
 Threshold Recording, Manual Start
 
@@ -209,11 +202,11 @@ Recording Methods:
 
 Sample: Standard recording, manual slice marker insertion during record
 
-Slice: Pads insert slice markers during record
+Slice: Virtual pads insert slice markers during record
 
-Pad Tap: Record directly to selected pad on tap (Drum Tracks)
+Pad Tap: Record directly to selected virtual pad on tap (Drum Tracks)
 
-Pad Hold: Record directly to selected pad while held (Drum Tracks)
+Pad Hold: Record directly to selected virtual pad while held (Drum Tracks)
 
 Post-Recording: Name, Assign to Track/Pad, Add Event, Edit
 
@@ -221,13 +214,13 @@ Integrated Tuner
 
 Auto Sampler:
 
-Automatically create Keygroup programs from internal plugins or external hardware
+Automatically create Keygroup programs from internal plugins or external audio sources (via USB-C)
 
 Parameters: Note Range, Velocity Layers, Note Length, Tail, Looping, Naming
 
 Sample Edit Mode:
 
-Waveform Display: Zoom, Scroll, Units (Time, Samples, Beats)
+Waveform Display: Zoom, Scroll (touch gestures), Units (Time, Samples, Beats)
 
 Trim Mode:
 
@@ -267,7 +260,7 @@ Create Patched Phrase (tempo-synced sample)
 
 Non-Destructive Slice Processes: Subset of Trim Mode processes applied to selected slice
 
-Pad Mode: Edit sample parameters within the context of its assigned pad/track
+Pad Mode: Edit sample parameters within the context of its assigned virtual pad/track
 
 Stems Separation:
 
@@ -278,7 +271,7 @@ Assign stems to Pad Layers or Sample Pool
 IV. Sound Generation & Synthesis
 Drum Tracks (Program Edit):
 
-Multi-layered samples per pad (up to 8)
+Multi-layered samples per virtual pad (e.g., up to 8)
 
 Layer Playback: Cycle, Velocity, Random
 
@@ -290,13 +283,13 @@ Envelopes: Amp, Filter, Pitch (AD/AHDS/ADSR types) with Velocity Modulation
 
 LFO: Waveform, Rate, Sync, Destinations (Pitch, Filter, Amp, Pan)
 
-Drum FX: 8 additional simple effects per pad (Ring Mod, Bit Crush, Drive, Filters etc.)
+Drum FX: Multiple additional simple effects per pad (e.g., Ring Mod, Bit Crush, Drive, Filters etc.)
 
 Utility: Flatten Pad, Create Keygroup from Pad
 
 Keygroup Tracks (Program Edit):
 
-Multi-layered, pitched samples per keygroup (up to 8 layers)
+Multi-layered, pitched samples per keygroup (e.g., up to 8 layers)
 
 Legacy & Advanced synthesis modes
 
@@ -316,17 +309,17 @@ Multiple LFOs (Per-voice & Global with advanced shaping)
 
 Utilities: Ramp Time, Note Counter, Drift, Timbre Shift, Portamento
 
-KG Stack: Unison & Harmonizer effects
+Keygroup Stack Effects: Unison & Harmonizer effects
 
-Modulation Matrix (32 slots)
+Modulation Matrix (e.g., 32 slots)
 
 Parameter Randomization
 
 Plugin Instruments:
 
-Host internal Akai synth and instrument plugins
+Host internal synth and instrument plugins
 
-Included Plugins: Bassline, Electric, Hype, TubeSynth, DrumSynth (individual & multi), Mellotron, Solina, WayOutWare Odyssey
+Internal Plugins (Examples): Bassline-style, Electric Piano-style, Versatile Synth (Hype-like), Analog-style Tube Synth, Drum Synth (individual & multi-sound), Tape-based Sampler (Mellotron-like), String Synth (Solina-like), Classic Analog Synth (Odyssey-style)
 
 Each plugin has its own unique interface and parameters
 
@@ -334,7 +327,7 @@ Sounds Mode:
 
 Browse and load Plugin instruments and presets
 
-Filter by track type, manage expansions
+Filter by track type, manage sound packs/expansions
 
 Favorites: Save and quickly recall preferred instrument presets
 
@@ -351,25 +344,25 @@ Volume: Level faders and meters
 
 Pan & Volume: Mute, Solo/Cue, Automation State, Record Arm, Pan, Level
 
-Sends: Levels for 4 Send buses
+Sends: Levels for multiple Send buses (e.g., 4)
 
-Effects: 4 Insert FX slots
+Effects: Multiple Insert FX slots (e.g., 4)
 
-I/O: Monitoring, MIDI In/Out/Channel/Send To, Audio In/Out routing
+I/O: Monitoring, MIDI In/Out/Channel/Send To (for MIDI tracks), Audio In/Out routing
 
-Mixer Configuration: Solo behavior, Crossfader profile, Metering options
+Mixer Configuration: Solo behavior, Crossfader profile (if applicable), Metering options
 
 Pad Mixer (for Drum/Keygroup Tracks):
 
-View and control individual pads within a track
+View and control individual virtual pads within a track
 
 Per-Pad Tabs: Similar to Channel Mixer (Volume, Pan & Volume, Sends, Effects, I/O for pad output routing)
 
 Pad Mixer Configuration: Filter view, Automation behavior
 
-Main Mode Mixer Strips:
+Quick Access Mixer Controls:
 
-Quick access to essential mixing parameters for current Pad/Track and related Main Output/Track
+UI elements for quick access to essential mixing parameters for current Pad/Track and related Main Output/Track
 
 Audio Routing:
 
@@ -381,16 +374,16 @@ Return tracks for Send Effects
 
 Input Configuration:
 
-Selectable audio inputs for recording (Audio Tracks, Sampler, Looper)
+Selectable audio inputs for recording (Audio Tracks, Sampler, Looper) via USB-C or device mic
 
-Configurable MIDI input port/channel per track
+Configurable MIDI input (USB/Bluetooth) per track
 
 VI. Effects Processing
 Insert Effects:
 
-Up to 4 per Pad, Track, Submix, Return, or Main Output
+Multiple slots (e.g., up to 4) per Pad, Track, Submix, Return, or Main Output
 
-Extensive library of effect types (Delay, Reverb, Dynamics, EQ/Filter, Harmonic, Modulation, Vocal - see Appendix for full list)
+Extensive library of effect types (Delay, Reverb, Dynamics, EQ/Filter, Harmonic, Modulation, Vocal - see Appendix for potential list)
 
 Parameter editing, Preset load/save per effect instance
 
@@ -398,13 +391,13 @@ FX Racks: Save and load chains of insert effects
 
 Send/Return Effects:
 
-4 dedicated Send buses
+Multiple dedicated Send buses (e.g., 4)
 
 Load effects onto Return tracks; control send levels from Tracks/Pads
 
-TouchFX / XYFX Mode:
+XY Pad Effects Control:
 
-Real-time XY pad control of dedicated TouchFX plugin or generic XYFX insert
+Real-time on-screen XY pad control of dedicated XY-controllable plugin or generic XY effect insert
 
 Various performance effects with X/Y parameter mapping
 
@@ -413,15 +406,13 @@ Latch mode, Attack/Release, Wet/Dry controls
 Master Effects: Effects applied to the Main Output track
 
 VII. Performance & Real-time Control
-Pads:
+Virtual Pads:
 
-Velocity & Pressure sensitive, RGB backlit
+Velocity & Pressure sensitive (simulated via touch), RGB backlit (on-screen)
 
 Full Level / Half Level / Custom Velocity modes
 
-16 Level Mode: Spread a parameter (Velocity, Tune, Filter, etc.) across 16 pads for dynamic performance
-
-Pad Perform Mode: Play Scales, Modes, Chords, and Progressions using the pads
+Performance Mode (e.g., "Scale Mode"): Play Scales, Modes, Chords, and Progressions using the virtual pads
 
 Note Repeat:
 
@@ -435,21 +426,17 @@ Built-in arpeggiator with various patterns, rates, octaves, swing, gate, humaniz
 
 Latch mode available
 
-Q-Link Knobs:
+Assignable Macro Controls / On-Screen Knobs:
 
-Touch-sensitive knobs for real-time parameter control
+Touch-sensitive on-screen knobs for real-time parameter control
 
-Multiple operational modes (Screen, Project, Track, Pad Scene, Pad Parameter, etc.)
+Multiple operational modes (Screen context, Project global, Track specific, Pad specific, etc.)
 
-Q-Link Edit Mode: Create custom macro assignments, learn parameters, define ranges and behaviors
-
-Touch Strip (MPC Key 61/37):
-
-Expressive controller for Note Repeat, Pitch Bend, Modulation, TouchFX
+Macro Control Edit Mode: Create custom macro assignments, learn parameters from app, define ranges and behaviors for on-screen knobs or mapped MIDI controllers
 
 Pad Mute / Track Mute Modes:
 
-Mute/Solo individual Pads (within Drum Tracks) or entire Tracks
+Mute/Solo individual Virtual Pads (within Drum Tracks) or entire Tracks
 
 Timing Correct quantization for mutes/solos
 
@@ -463,58 +450,44 @@ Sync to tempo, reverse, clear, export loop
 
 MIDI Learn:
 
-Map external MIDI controller knobs/buttons to MPC parameters
+Map external MIDI controller knobs/buttons (via USB/Bluetooth) to app parameters
 
-MIDI Control Mode:
+MIDI Control Mode (Output Mapping):
 
-Customize MIDI messages sent from MPC hardware controls to external gear
+Customize MIDI messages sent from app controls (virtual or mapped) to external MIDI gear/apps
 
 VIII. Editing & Workflow Tools
 Core Editing: Undo/Redo, Erase (real-time or window), Copy/Delete
 
-Navigation: Data Dial, Cursor Buttons, +/- Buttons, On-screen Numeric Keypad
+Navigation Controls: On-screen data dial simulation, +/- buttons, touch gestures
 
 Time Counter / Locate Window: Precise playhead positioning, loop/record settings
 
-Main Mode Shortcuts: Customizable quick access to frequently used modes
+Customizable Workflow Shortcuts: Quick access to frequently used modes/functions
 
-Contextual Function Buttons: Screen-dependent soft buttons
+Context-Sensitive On-Screen Controls: UI elements adapt to current task
 
-Pad Color Mode: Assign custom colors to pads for visual organization
+Virtual Pad Color Mode: Assign custom colors to virtual pads for visual organization
 
-Key Ranges Mode: Visual overview of MIDI track key ranges for keyboard setups, with MIDI filtering
+Key Ranges Mode: Visual overview of MIDI track key ranges for external keyboard input, with MIDI filtering
 
-IX. System & Hardware Integration
-Hardware Compatibility: MPC X/X SE, Live/Live II, One/One+, Key 61/Key 37
+IX. System & App Integration
+Android App Environment
 
-Standalone & Controller Mode Operation (with computer MPC Software)
+Audio Interface Support (via USB-C): Configuration for external audio devices
 
-Audio Interface: Integrated inputs/outputs, preamps, phantom power (varies by model)
-
-MIDI Interface: Physical MIDI In/Out/Thru ports
-
-CV/Gate Outputs: For controlling analog modular/semi-modular gear (varies by model)
-
-Storage: Internal drive, SD Card, USB drive support, SATA drive expansion (on select models)
-
-Battery Power: For MPC Live / Live II
-
-Keyboard Control (MPC Key 61/37):
-
-Extensive customization of keybed response, MIDI routing, pedal functions, pitch/mod wheel assignments
-
-Scale filtering for keyboard input
+Storage: Internal device storage, SD Card (if supported by Android device), USB storage (via USB-C)
 
 System Preferences:
 
 Global settings for Sync, MIDI, Audio, Project Load/Save, UI behavior
 
-Reset options for menu layout and preferences
+Reset options for UI layout and preferences
 
 X. Connectivity & Synchronization
 MIDI:
 
-Physical & USB MIDI I/O
+USB & Bluetooth MIDI I/O
 
 MIDI Clock Send/Receive
 
@@ -524,11 +497,10 @@ MIDI Machine Control (MMC) Send/Receive
 
 MIDI Monitor for troubleshooting
 
+Network Connectivity:
 
+Wi-Fi for firmware/app updates, online services (e.g., cloud storage, sample downloads)
 
+Bluetooth:
 
-
-
-
-
-
+For MIDI controllers & audio output
