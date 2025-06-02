@@ -6,6 +6,8 @@ import android.media.SoundPool
 import android.util.Log
 import kotlin.math.pow
 
+// kotlin.math.pow import removed as we are using java.lang.Math.pow
+
 class AudioPlayer(private val context: Context) {
 
     private val soundPool: SoundPool
@@ -43,7 +45,7 @@ class AudioPlayer(private val context: Context) {
         if (soundId != null) {
             // Calculate rate from pitch (semitones)
             // 2^(pitch/12) gives the rate multiplier. e.g., +12 semitones = 2x rate, -12 semitones = 0.5x rate
-            val rate = kotlin.math.pow(2.0f, pitch / 12.0f).coerceIn(0.5f, 2.0f) // Clamp rate
+            val rate = 2.0.pow((pitch / 12.0f).toDouble()).toFloat().coerceIn(0.5f, 2.0f) // Clamp rate
             val clampedVolume = volume.coerceIn(0.0f, 1.0f) // Clamp volume
 
             soundPool.play(soundId, clampedVolume, clampedVolume, 0, 0, rate)
