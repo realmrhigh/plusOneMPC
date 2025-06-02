@@ -1,10 +1,11 @@
 import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
-import { Sample, Pad, Track, Pattern, ProcessorSettings, TransportSettings, QuantizationValue } from '../types';
+import { Sample, Pad, Track, Pattern, ProcessorSettings, TransportSettings, QuantizationValue, DrumKit } from '../types';
 import { defaultPads, sampleLibrary } from '../samples';
 import { kitPresets, defaultPatterns, createEmptyPattern } from '../presets';
 import audioEngine, { MidiEvent, onMidiEvent, startMidiRecording, stopMidiRecording, recordMidiEvent } from '../audio';
 import * as persistence from '../persistence';
+import { MPC_PROJECT_VERSION, ProjectData } from '../persistence';
 import * as Tone from 'tone';
 
 // Define 16 levels mode types
@@ -69,6 +70,13 @@ interface DrumMachineState {
   
   // Sample color management
   updateSampleColor: (sampleId: string, color: string) => void;
+
+  // Project management
+  saveProject: (projectName: string) => void;
+  loadProject: (projectName: string) => boolean;
+  listProjects: () => string[];
+  deleteProject: (projectName: string) => void;
+  currentProjectName: string | null;
 }
 
 export const useDrumMachineStore = create<DrumMachineState>()(
@@ -83,11 +91,12 @@ export const useDrumMachineStore = create<DrumMachineState>()(
     const savedTempo = persistence.loadTempo();
     const savedSwing = persistence.loadSwing();
     const savedQuantization = persistence.loadQuantization();
-    
+
     // Initialize loaded kits or use defaults
     const initialKits = savedDrumKits || kitPresets;
-    
+
     return {
+      currentProjectName: null,
       // Use loaded state or defaults
       samples: sampleLibrary,
       pads: savedPads || defaultPads,
@@ -823,7 +832,82 @@ export const useDrumMachineStore = create<DrumMachineState>()(
           console.log(`Updated color for sample ${sampleId} to ${color}`);
           return { samples: updatedSamples };
         });
-      }
+      },
+
+      // Project management
+      saveProject: (projectName: string) => {
+        const { kits, patterns, samples, processorSettings, transport, currentKitId, currentPatternId, pads, isMetronomeEnabled } = get();
+        const projectData: ProjectData = {
+          version: MPC_PROJECT_VERSION,
+          projectName,
+          kits,
+          patterns,
+          samples,
+          processorSettings,
+          transport,
+          isMetronomeEnabled,
+          currentKitId,
+          currentPatternId,
+          pads,
+        };
+        persistence.saveProjectToStorage(projectName, projectData);
+        set({ currentProjectName: projectName });
+      },
+
+      loadProject: (projectName: string) => {
+        const projectData = persistence.loadProjectFromStorage(projectName);
+        if (projectData) {
+          set({
+            kits: projectData.kits,
+            patterns: projectData.patterns,
+            samples: projectData.samples,
+            processorSettings: projectData.processorSettings,
+            transport: projectData.transport,
+            isMetronomeEnabled: projectData.isMetronomeEnabled,
+            currentKitId: projectData.currentKitId,
+            currentPatternId: projectData.currentPatternId,
+            pads: projectData.pads,
+            currentProjectName: projectName,
+            activePadId: null,
+            isRecording: false,
+            isOverdubbing: false,
+          });
+
+          audioEngine.setTempo(projectData.transport.tempo);
+          audioEngine.setSwing(projectData.transport.swing / 100); // Assuming swing is 0-100 in store, 0-1 in engine
+          audioEngine.toggleMetronome(projectData.isMetronomeEnabled);
+
+          // Re-apply pad assignments
+          const currentKit = projectData.kits.find(k => k.id === projectData.currentKitId);
+          if (currentKit) {
+            const updatedPads = projectData.pads.map(pad => {
+              const assignment = currentKit.assignments.find(a => a.padId === pad.id);
+              return {
+                ...pad,
+                sampleId: assignment ? assignment.sampleId : null,
+              };
+            });
+            set({ pads: updatedPads });
+          } else {
+            // if kit not found, use projectData.pads directly (though this case should ideally not happen)
+             set({ pads: projectData.pads });
+          }
+          return true;
+        }
+        return false;
+      },
+
+      listProjects: () => {
+        return persistence.listProjectsFromStorage();
+      },
+
+      deleteProject: (projectName: string) => {
+        persistence.deleteProjectFromStorage(projectName);
+        if (get().currentProjectName === projectName) {
+          set({ currentProjectName: null });
+          // Optionally, reset to a default state or clear the current project related data
+        }
+      },
     };
   })
 );

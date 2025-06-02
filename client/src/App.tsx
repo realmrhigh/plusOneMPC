@@ -14,8 +14,10 @@ import { setupAudioContext } from "@/lib/audio";
 import { Canvas } from "@react-three/fiber";
 import { Suspense } from "react";
 import { useIsMobile } from "@/hooks/use-is-mobile";
-import { Menu, X, Settings, Sliders, Save, Library, Play, Pause, Archive, RefreshCw, Volume2, VolumeX, Scissors, Grid } from 'lucide-react';
+import { Menu, X, Settings, Sliders, Save, Library, Play, Pause, Archive, RefreshCw, Volume2, VolumeX, Scissors, Grid, Database } from 'lucide-react'; // Added Database
 import "@fontsource/inter";
+import { Toaster } from 'sonner';
+import ProjectPanel from '@/components/DrumMachine/ProjectPanel';
 
 // Main App component
 function App() {
@@ -66,6 +68,7 @@ function App() {
 
   return (
     <QueryClientProvider client={queryClient}>
+      <Toaster richColors position="top-center" />
       <div className="min-h-screen bg-red-900 text-white overflow-x-hidden" style={{ backgroundColor: '#770000' }}>
         {!isAudioInitialized && (
           <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center">
@@ -205,6 +208,13 @@ function App() {
                   >
                     <Grid size={24} />
                   </button>
+                  <button
+                    onClick={() => setActivePanel(activePanel === 'project' ? null : 'project')}
+                    className={`bg-red-700 hover:bg-red-600 text-white rounded-full p-3 shadow-lg border-2 ${activePanel === 'project' ? 'border-white' : 'border-red-600'}`}
+                    title="Projects"
+                  >
+                    <Database size={24} />
+                  </button>
                 </div>
               )}
               
@@ -313,6 +323,22 @@ function App() {
                     </button>
                   </div>
                   <MidiGrid onClose={() => setActivePanel(null)} />
+                </div>
+              </div>
+
+              {/* Project Panel (slides from top) */}
+              <div className={`absolute top-0 left-0 right-0 bg-red-800 border-b-4 border-red-600 z-20 transition-transform duration-300 shadow-lg overflow-auto max-h-[80vh] ${activePanel === 'project' ? 'translate-y-0' : '-translate-y-full'}`}>
+                <div className="p-3">
+                  <div className="flex justify-between items-center mb-2">
+                    <h2 className="text-xl font-bold text-white">Project Management</h2>
+                    <button
+                      onClick={() => setActivePanel(null)}
+                      className="bg-red-700 hover:bg-red-600 text-white rounded-full p-1"
+                    >
+                      <X size={20} />
+                    </button>
+                  </div>
+                  <ProjectPanel onClose={() => setActivePanel(null)} />
                 </div>
               </div>
             </div>

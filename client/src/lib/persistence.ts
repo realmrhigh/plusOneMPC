@@ -1,4 +1,62 @@
-import { Pattern, Pad, ProcessorSettings, DrumKit } from './types';
+import { Pattern, Pad, ProcessorSettings, DrumKit, Sample, TransportSettings } from './types';
+
+export const MPC_PROJECT_VERSION = '1.0';
+
+export interface ProjectData {
+  version: string;
+  projectName: string;
+  kits: DrumKit[];
+  patterns: Pattern[];
+  samples: Sample[];
+  processorSettings: ProcessorSettings[];
+  transport: TransportSettings; // tempo, playing, currentStep, swing, quantization
+  isMetronomeEnabled: boolean;
+  currentKitId: string;
+  currentPatternId: number;
+  pads: Pad[];
+}
+
+const PROJECT_STORAGE_PREFIX = 'mpcProject_';
+
+export const saveProjectToStorage = (projectName: string, projectData: ProjectData): void => {
+  localStorage.setItem(PROJECT_STORAGE_PREFIX + projectName, JSON.stringify(projectData));
+};
+
+export const loadProjectFromStorage = (projectName: string): ProjectData | null => {
+  const projectString = localStorage.getItem(PROJECT_STORAGE_PREFIX + projectName);
+  if (projectString) {
+    try {
+      const projectData = JSON.parse(projectString) as ProjectData;
+      // Basic version check, can be expanded later
+      if (projectData.version === MPC_PROJECT_VERSION) {
+        return projectData;
+      } else {
+        console.warn(`Project version mismatch for ${projectName}. Expected ${MPC_PROJECT_VERSION}, got ${projectData.version}`);
+        // Handle version migration or rejection here if necessary
+        return null; // Or attempt migration
+      }
+    } catch (error) {
+      console.error(`Error loading project ${projectName}:`, error);
+      return null;
+    }
+  }
+  return null;
+};
+
+export const listProjectsFromStorage = (): string[] => {
+  const projectNames: string[] = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (key && key.startsWith(PROJECT_STORAGE_PREFIX)) {
+      projectNames.push(key.replace(PROJECT_STORAGE_PREFIX, ''));
+    }
+  }
+  return projectNames;
+};
+
+export const deleteProjectFromStorage = (projectName: string): void => {
+  localStorage.removeItem(PROJECT_STORAGE_PREFIX + projectName);
+};
 
 // LocalStorage keys
 const STORAGE_KEYS = {
