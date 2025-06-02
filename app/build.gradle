@@ -9,7 +9,7 @@ android {
     compileSdk 36
     defaultConfig {
         applicationId "com.example.kotlindrummachine"
-        minSdkVersion 21
+        minSdkVersion 30
         targetSdk 36
         versionCode 1
         versionName "1.0"
@@ -44,7 +44,8 @@ dependencies {
     implementation libs.ui // Check for latest version
     implementation libs.ui.tooling.preview // Check for latest version
     implementation libs.androidx.material // Check for latest version
-    implementation libs.kotlinx.serialization.json // Serialization
+    implementation libs.kotlinx.serialization.json
+    implementation libs.androidx.material3.android// Serialization
     testImplementation libs.junit
     androidTestImplementation libs.androidx.junit.v115
     androidTestImplementation libs.androidx.espresso.core.v351

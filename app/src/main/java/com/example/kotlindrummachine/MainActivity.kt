@@ -5,9 +5,6 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.material.MaterialTheme
-import androidx.compose.material.Surface
-import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -19,9 +16,13 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.activity.viewModels
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-// import androidx.lifecycle.ViewModel // Will be replaced by specific import
+
 import android.app.Application
 import androidx.lifecycle.ViewModelProvider
+//import androidx.lifecycle.ViewModel // Will be replaced by specific import
+import androidx.compose.material.MaterialTheme
+import androidx.compose.material.Surface
+import androidx.compose.material.Text
 import androidx.compose.material.Button
 import androidx.compose.material.Slider
 import androidx.compose.material.Switch // For Metronome Toggle
@@ -213,8 +214,7 @@ fun DrumMachineApp(
                             // Confirmation sound is played if source is valid (handled by VM event or direct feedback)
                         }
                         is16LevelsModeActive && levelsSourcePadId != null -> {
-                            val sourcePadActualId = levelsSourcePadId
-                            val sourcePad = pads.find { it.id == sourcePadActualId }
+                            val sourcePad = pads.find { it.id == levelsSourcePadId }
                             if (sourcePad?.sampleId != null) {
                                 val pitchOffset = pad.id - 8
                                 audioPlayer.playSound(
