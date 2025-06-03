@@ -18,6 +18,7 @@ import kotlinx.coroutines.launch
 import java.util.UUID
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 //import kotlinx.coroutines.OptIn
+import com.example.kotlindrummachine.Screen // Import Screen enum
 
 interface DrumMachineViewInterface {
     fun renamePattern(patternId: Int, newName: String) // open is default for interface methods
@@ -112,6 +113,14 @@ open class DrumMachineViewModel(application: Application, private val audioPlaye
     private val _uiEvents = MutableSharedFlow<String>()
     open val uiEvents = _uiEvents.asSharedFlow()
 
+    // --- Navigation State ---
+    private val _currentScreen = MutableStateFlow(Screen.DrumPadView)
+    open val currentScreen: StateFlow<Screen> = _currentScreen.asStateFlow()
+
+    open fun navigateTo(screen: Screen) {
+        _currentScreen.value = screen
+    }
+    // --- End Navigation State ---
 
     // Playback State
     private val _isPlaying = MutableStateFlow(false) // Playback state is not persisted

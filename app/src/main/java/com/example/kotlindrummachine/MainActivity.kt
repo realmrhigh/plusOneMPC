@@ -52,7 +52,21 @@ import kotlinx.coroutines.flow.stateIn // Added for stateIn
 import kotlinx.coroutines.launch // Ensure this is present for viewModelScope.launch
 // PadSettings is likely in DataModels.kt, assuming it's available in the package
 // import com.example.kotlindrummachine.PadSettings // Already available due to package structure or other imports
+import com.example.kotlindrummachine.Screen // Import Screen enum
 
+import androidx.compose.material.ModalNavigationDrawer
+import androidx.compose.material.DrawerValue
+import androidx.compose.material.rememberDrawerState
+import androidx.compose.material.Scaffold
+import androidx.compose.material.TopAppBar
+import androidx.compose.material.IconButton
+import androidx.compose.material.Icon
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Menu
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.text.style.TextAlign // For Text alignment in drawer
+// For TextButton in drawer, already imported: androidx.compose.material.TextButton
+// For launch, already imported: kotlinx.coroutines.launch
 
 // Custom ViewModel Factory for AndroidViewModel
 class DrumMachineViewModelFactory(
@@ -113,12 +127,15 @@ class MainActivity : ComponentActivity() {
                     val levelsSourcePadId by drumMachineViewModel.levelsSourcePadId.collectAsState()
                     val isSelectingLevelsSourcePad by drumMachineViewModel.isSelectingLevelsSourcePad.collectAsState()
                     val canSetSourcePad by drumMachineViewModel.canSetSourcePad.collectAsState() // Collect new state
+                    val currentScreen by drumMachineViewModel.currentScreen.collectAsState()
 
 
                     DrumMachineApp(
                         audioPlayer = audioPlayer,
                         pads = padsState,
                         viewModel = drumMachineViewModel,
+                        currentScreen = currentScreen,
+                        onNavigateTo = { screen -> drumMachineViewModel.navigateTo(screen) },
                         isPlaying = isPlaying,
                         isRecording = isRecording,
                         currentStep = currentStep,
@@ -167,8 +184,13 @@ fun DrumMachineApp(
     is16LevelsModeActive: Boolean,
     levelsSourcePadId: Int?,
     isSelectingLevelsSourcePad: Boolean,
-    canSetSourcePad: Boolean // Receive new state
+    canSetSourcePad: Boolean, // Receive new state
+    currentScreen: Screen, // New parameter
+    onNavigateTo: (Screen) -> Unit // New parameter for navigation callback
 ) {
+    val drawerState = rememberDrawerState(DrawerValue.Closed)
+    val scope = rememberCoroutineScope()
+
     val showPadEditDialog = rememberSaveable { mutableStateOf(false) }
     val editingPad = remember { mutableStateOf<Pad?>(null) }
     val showSampleSelectDialog = remember { mutableStateOf(false) }
@@ -186,429 +208,254 @@ fun DrumMachineApp(
         }
     }
 
-    Column(
-        modifier = Modifier.fillMaxSize(),
-        horizontalAlignment = Alignment.CenterHorizontally
+    ModalNavigationDrawer(
+        drawerState = drawerState,
+        drawerContent = {
+            Column(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .background(MaterialTheme.colors.surface) // Use theme color for drawer background
+                    .padding(16.dp)
+            ) {
+                Text(
+                    "Navigation",
+                    style = MaterialTheme.typography.h6,
+                    modifier = Modifier.padding(bottom = 16.dp)
+                )
+                Screen.values().forEach { screen ->
+                    TextButton(
+                        onClick = {
+                            onNavigateTo(screen)
+                            scope.launch { drawerState.close() }
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp)
+                    ) {
+                        Text(screen.title, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Start)
+                    }
+                }
+            }
+        }
     ) {
-        Text(
-            text = "Kotlin Drum Machine",
-            style = MaterialTheme.typography.h5,
-            modifier = Modifier.padding(16.dp)
-        )
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(250.dp) // Adjusted height for DrumPadGrid
-                .background(Color.LightGray)
-        ) {
-            // DrumPadGrid's onClick is implicitly handled by how it's called if it directly uses ViewModel
-            // or by passing a lambda that has access to the ViewModel.
-            // The current DrumPadGrid takes pads and audioPlayer.
-            // We will modify its invocation or structure if direct ViewModel interaction for clicks is needed.
-            // For now, let's assume pad click logic is handled where DrumPadGrid is used or modified.
-            DrumPadGrid(
-                pads = pads,
-                onPadClick = { pad ->
-                    when {
-                        isSelectingLevelsSourcePad -> {
-                            viewModel.setLevelsSourcePad(pad.id)
-                            // Confirmation sound is played if source is valid (handled by VM event or direct feedback)
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = { Text(currentScreen.title) },
+                    navigationIcon = {
+                        IconButton(onClick = {
+                            scope.launch { drawerState.open() }
+                        }) {
+                            Icon(
+                                imageVector = Icons.Filled.Menu,
+                                contentDescription = "Open Navigation Drawer"
+                            )
                         }
-                        is16LevelsModeActive && levelsSourcePadId != null -> {
-                            val sourcePad = pads.find { it.id == levelsSourcePadId }
-                            if (sourcePad?.sampleId != null) {
-                                val pitchOffset = pad.id - 8
-                                audioPlayer.playSound(
-                                    sourcePad.sampleId!!,
-                                    sourcePad.volume,
-                                    sourcePad.pitch + pitchOffset
+                    },
+                    backgroundColor = MaterialTheme.colors.primary // Optional: Standard primary color
+                )
+            },
+            content = { paddingValues ->
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(paddingValues), // Apply padding from Scaffold
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    when (currentScreen) {
+                        Screen.DrumPadView -> {
+                            Text(
+                                text = "Kotlin Drum Machine",
+                                style = MaterialTheme.typography.h5,
+                                modifier = Modifier.padding(16.dp)
+                            )
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(250.dp) // Adjusted height for DrumPadGrid
+                                    .background(Color.LightGray)
+                            ) {
+                                DrumPadGrid(
+                                    pads = pads,
+                                    onPadClick = { pad ->
+                                        when {
+                                            isSelectingLevelsSourcePad -> {
+                                                viewModel.setLevelsSourcePad(pad.id)
+                                            }
+                                            is16LevelsModeActive && levelsSourcePadId != null -> {
+                                                val sourcePad = pads.find { it.id == levelsSourcePadId }
+                                                if (sourcePad?.sampleId != null) {
+                                                    val pitchOffset = pad.id - 8
+                                                    audioPlayer.playSound(
+                                                        sourcePad.sampleId!!,
+                                                        sourcePad.volume,
+                                                        sourcePad.pitch + pitchOffset
+                                                    )
+                                                }
+                                            }
+                                            else -> {
+                                                pad.sampleId?.let { sampleId ->
+                                                    audioPlayer.playSound(sampleId, pad.volume, pad.pitch)
+                                                }
+                                                if (viewModel.isRecording.value && viewModel.isPlaying.value) {
+                                                    viewModel.recordPadTap(pad.id)
+                                                }
+                                            }
+                                        }
+                                    },
+                                    onPadLongClick = { pad ->
+                                        if (!isSelectingLevelsSourcePad && !is16LevelsModeActive) {
+                                            editingPad.value = pad
+                                            showPadEditDialog.value = true
+                                        }
+                                    }
                                 )
                             }
-                        }
-                        else -> {
-                            pad.sampleId?.let { sampleId ->
-                                audioPlayer.playSound(sampleId, pad.volume, pad.pitch)
+
+                            // Pad Edit Dialog
+                            if (showPadEditDialog.value && editingPad.value != null) {
+                                val currentEditingPad = editingPad.value!! // Safe due to check
+                                AlertDialog(
+                                    onDismissRequest = { showPadEditDialog.value = false },
+                                    title = { Text("Edit Pad ${currentEditingPad.id}") },
+                                    text = {
+                                        Column {
+                                            Text("Sample: ${currentEditingPad.sampleId ?: "None"}")
+                                            Button(onClick = { showSampleSelectDialog.value = true }) { Text("Change Sample") }
+                                            DropdownMenu(
+                                                expanded = showSampleSelectDialog.value,
+                                                onDismissRequest = { showSampleSelectDialog.value = false }
+                                            ) {
+                                                samples.forEach { sample ->
+                                                    DropdownMenuItem(onClick = {
+                                                        viewModel.assignSampleToPad(currentEditingPad.id, sample.id)
+                                                        editingPad.value = currentEditingPad.copy(sampleId = sample.id)
+                                                        showSampleSelectDialog.value = false
+                                                    }) { Text(sample.name) }
+                                                }
+                                                DropdownMenuItem(onClick = {
+                                                    viewModel.assignSampleToPad(currentEditingPad.id, null)
+                                                    editingPad.value = currentEditingPad.copy(sampleId = null)
+                                                    showSampleSelectDialog.value = false
+                                                }) { Text("None (Clear Sample)") }
+                                            }
+                                            Spacer(modifier = Modifier.height(16.dp))
+                                            Text("Volume: ${String.format("%.2f", currentEditingPad.volume)}")
+                                            Slider(
+                                                value = currentEditingPad.volume,
+                                                onValueChange = { newVolume ->
+                                                    viewModel.setPadVolume(currentEditingPad.id, newVolume)
+                                                    editingPad.value = currentEditingPad.copy(volume = newVolume)
+                                                },
+                                                valueRange = 0f..1f
+                                            )
+                                            Spacer(modifier = Modifier.height(8.dp))
+                                            Text("Pitch: ${String.format("%.1f", currentEditingPad.pitch)} semitones")
+                                            Slider(
+                                                value = currentEditingPad.pitch,
+                                                onValueChange = { newPitch ->
+                                                    viewModel.setPadPitch(currentEditingPad.id, newPitch)
+                                                    editingPad.value = currentEditingPad.copy(pitch = newPitch)
+                                                },
+                                                valueRange = -12f..12f,
+                                                steps = 23
+                                            )
+                                        }
+                                    },
+                                    confirmButton = { Button(onClick = { showPadEditDialog.value = false }) { Text("Done") } }
+                                )
                             }
-                            if (viewModel.isRecording.value && viewModel.isPlaying.value) {
-                                viewModel.recordPadTap(pad.id)
-                            }
-                        }
-                    }
-                },
-                onPadLongClick = { pad ->
-                    if (!isSelectingLevelsSourcePad && !is16LevelsModeActive) {
-                        editingPad.value = pad
-                        showPadEditDialog.value = true
-                    }
-                }
-            )
-        }
 
-        SequencerView(viewModel = viewModel)
+                            // Pattern, Kit, and Tempo Controls Section
+                            Column(modifier = Modifier.padding(horizontal = 8.dp)) {
+                                // Active Kit Display
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text("Active Kit: $activeKitName", style = MaterialTheme.typography.subtitle1, modifier = Modifier.weight(1f))
+                                    val showSaveKitDialog = rememberSaveable { mutableStateOf(false) }
+                                    val newKitName = rememberSaveable { mutableStateOf("") }
+                                    Button(onClick = { showSaveKitDialog.value = true }) { Text("Save Kit") }
 
-        // Pad Edit Dialog
-        if (showPadEditDialog.value && editingPad.value != null) {
-            val currentEditingPad = editingPad.value!! // Safe due to check
+                                    if (showSaveKitDialog.value) {
+                                        AlertDialog(
+                                            onDismissRequest = { showSaveKitDialog.value = false },
+                                            title = { Text("Save Drum Kit") },
+                                            text = { TextField(value = newKitName.value, onValueChange = { newKitName.value = it }, label = { Text("Kit Name") }, singleLine = true) },
+                                            confirmButton = { Button(onClick = { viewModel.saveCurrentAssignmentsAsKit(newKitName.value.ifBlank { "Untitled Kit" }); showSaveKitDialog.value = false }) { Text("Save") } },
+                                            dismissButton = { Button(onClick = { showSaveKitDialog.value = false }) { Text("Cancel") } }
+                                        )
+                                    }
+                                }
+                                // Kit Selection Row
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().padding(bottom = 2.dp),
+                                    horizontalArrangement = Arrangement.Start,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    TextButton(onClick = { activeKitId?.let { akid -> val currentIndex = kits.indexOfFirst { it.id == akid }; if (currentIndex > 0) viewModel.selectKit(kits[currentIndex - 1].id) } }, enabled = kits.indexOfFirst { it.id == activeKitId } > 0) { Text("< Kit") }
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    TextButton(onClick = { activeKitId?.let { akid -> val currentIndex = kits.indexOfFirst { it.id == akid }; if (currentIndex < kits.size - 1) viewModel.selectKit(kits[currentIndex + 1].id) } }, enabled = kits.indexOfFirst { it.id == activeKitId } < kits.size - 1 && kits.isNotEmpty()) { Text("Kit >") }
+                                }
+                                // Pattern Controls Row
+                                Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                                    Text("Pattern: ${currentPattern?.name ?: "N/A"}", style = MaterialTheme.typography.h6, modifier = Modifier.weight(1f))
+                                }
+                                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceAround, verticalAlignment = Alignment.CenterVertically) {
+                                    TextButton(onClick = { currentPattern?.let { cp -> val currentIndex = allPatterns.indexOfFirst { it.id == cp.id }; if (currentIndex > 0) viewModel.selectPattern(allPatterns[currentIndex - 1].id) } }, enabled = (allPatterns.indexOfFirst { it.id == currentPattern?.id } > 0)) { Text("< Prev") }
+                                    Button(onClick = { currentPattern?.let { renameText.value = it.name; showRenameDialog.value = true } }, enabled = currentPattern != null) { Text("Rename") }
+                                    TextButton(onClick = { viewModel.createNewPattern() }) { Text("New") }
+                                    Button(onClick = { if (currentPattern != null) showClearPatternDialog.value = true }, enabled = currentPattern != null) { Text("Clear") }
+                                    Button(onClick = { if (currentPattern != null) showDeleteDialog.value = true }, enabled = currentPattern != null) { Text("Delete") }
+                                    TextButton(onClick = { currentPattern?.let { cp -> val currentIndex = allPatterns.indexOfFirst { it.id == cp.id }; if (currentIndex < allPatterns.size - 1) viewModel.selectPattern(allPatterns[currentIndex + 1].id) } }, enabled = (allPatterns.indexOfFirst { it.id == currentPattern?.id } < allPatterns.size - 1 && allPatterns.isNotEmpty())) { Text("Next >") }
+                                }
 
-            AlertDialog(
-                onDismissRequest = { showPadEditDialog.value = false },
-                title = { Text("Edit Pad ${currentEditingPad.id}") },
-                text = {
-                    Column {
-                        // Sample Selection
-                        Text("Sample: ${currentEditingPad.sampleId ?: "None"}")
-                        Button(onClick = { showSampleSelectDialog.value = true }) {
-                            Text("Change Sample")
-                        }
-                        DropdownMenu(
-                            expanded = showSampleSelectDialog.value,
-                            onDismissRequest = { showSampleSelectDialog.value = false }
-                        ) {
-                            samples.forEach { sample ->
-                                DropdownMenuItem(onClick = {
-                                    viewModel.assignSampleToPad(currentEditingPad.id, sample.id)
-                                    editingPad.value = currentEditingPad.copy(sampleId = sample.id) // Update local state
-                                    showSampleSelectDialog.value = false
-                                }) {
-                                    Text(sample.name)
+                                // Rename Dialog
+                                if (showRenameDialog.value) { AlertDialog(onDismissRequest = { showRenameDialog.value = false }, title = { Text("Rename Pattern") }, text = { TextField(value = renameText.value, onValueChange = { renameText.value = it }, singleLine = true) }, confirmButton = { Button(onClick = { currentPattern?.let { viewModel.renamePattern(it.id, renameText.value) }; showRenameDialog.value = false }) { Text("Rename") } }, dismissButton = { Button(onClick = { showRenameDialog.value = false }) { Text("Cancel") } }) }
+                                // Delete Confirmation Dialog
+                                if (showDeleteDialog.value) { AlertDialog(onDismissRequest = { showDeleteDialog.value = false }, title = { Text("Confirm Delete") }, text = { Text("Are you sure you want to delete '${currentPattern?.name}'?") }, confirmButton = { Button(onClick = { currentPattern?.let { viewModel.deletePattern(it.id) }; showDeleteDialog.value = false }) { Text("Delete") } }, dismissButton = { Button(onClick = { showDeleteDialog.value = false }) { Text("Cancel") } }) }
+                                // Clear Pattern Confirmation Dialog
+                                if (showClearPatternDialog.value) { AlertDialog(onDismissRequest = { showClearPatternDialog.value = false }, title = { Text("Confirm Clear Pattern") }, text = { Text("Are you sure you want to clear all notes in '${currentPattern?.name ?: "this pattern"}'?") }, confirmButton = { Button(onClick = { viewModel.clearCurrentPattern(); showClearPatternDialog.value = false }) { Text("Clear") } }, dismissButton = { Button(onClick = { showClearPatternDialog.value = false }) { Text("Cancel") } }) }
+
+                                // 16 Levels Controls Row
+                                Row(modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp, horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceAround) {
+                                    Button(onClick = { viewModel.toggle16LevelsMode() }) { Text(if (is16LevelsModeActive) "Exit 16 Levels" else "16 Levels") }
+                                    Button(onClick = { viewModel.startSelectingLevelsSourcePad() }, enabled = is16LevelsModeActive && canSetSourcePad, colors = ButtonDefaults.buttonColors(backgroundColor = if (isSelectingLevelsSourcePad) Color.Yellow else MaterialTheme.colors.secondary)) { Text(if (isSelectingLevelsSourcePad) "Tap Pad..." else if (is16LevelsModeActive && !canSetSourcePad) "No Samples" else "Set Source") }
+                                    val sourcePadInfo = levelsSourcePadId?.let { srcId -> pads.find { it.id == srcId }?.let { "Src: ${it.sampleId?.take(4) ?: "P${it.id}"}" } ?: "Src: P$srcId" } ?: "Src: None"
+                                    Text(sourcePadInfo, style = MaterialTheme.typography.body2)
+                                }
+                                // Metronome Controls Row
+                                Row(modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 8.dp)) { Switch(checked = isMetronomeEnabled, onCheckedChange = { viewModel.toggleMetronome() }); Text("Metronome", style = MaterialTheme.typography.body2, modifier = Modifier.padding(start = 4.dp, end = 8.dp)) }
+                                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f).padding(end=8.dp)) { Slider(value = metronomeVolume, onValueChange = { viewModel.setMetronomeVolume(it) }, valueRange = 0f..1f, modifier = Modifier.weight(1f)); Text(text = "${(metronomeVolume * 100).toInt()}%", style = MaterialTheme.typography.caption, modifier = Modifier.width(40.dp).padding(start = 4.dp)) }
                                 }
                             }
-                            DropdownMenuItem(onClick = { // Option to clear sample
-                                viewModel.assignSampleToPad(currentEditingPad.id, null)
-                                editingPad.value = currentEditingPad.copy(sampleId = null)
-                                showSampleSelectDialog.value = false
-                            }) {
-                                Text("None (Clear Sample)")
+                            // Transport Controls Row
+                            Row(modifier = Modifier.fillMaxWidth().padding(8.dp).height(60.dp).background(Color.DarkGray), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
+                                Button(onClick = { viewModel.startPlayback() }, enabled = !isPlaying) { Text("Play") }
+                                Button(onClick = { viewModel.stopPlayback() }, enabled = isPlaying) { Text("Stop") }
+                                Button(onClick = { viewModel.toggleRecording() }, colors = ButtonDefaults.buttonColors(backgroundColor = if (isRecording) Color.Red else MaterialTheme.colors.secondary)) { Text("Record") }
+                                Text("Step: ${currentStep + 1}", color = Color.White, style = MaterialTheme.typography.body1)
                             }
                         }
-                        Spacer(modifier = Modifier.height(16.dp))
-
-                        // Volume Slider
-                        Text("Volume: ${String.format("%.2f", currentEditingPad.volume)}")
-                        Slider(
-                            value = currentEditingPad.volume,
-                            onValueChange = { newVolume ->
-                                viewModel.setPadVolume(currentEditingPad.id, newVolume)
-                                editingPad.value = currentEditingPad.copy(volume = newVolume)
-                            },
-                            valueRange = 0f..1f
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-
-                        // Pitch Slider
-                        Text("Pitch: ${String.format("%.1f", currentEditingPad.pitch)} semitones")
-                        Slider(
-                            value = currentEditingPad.pitch,
-                            onValueChange = { newPitch ->
-                                viewModel.setPadPitch(currentEditingPad.id, newPitch)
-                                editingPad.value = currentEditingPad.copy(pitch = newPitch)
-                            },
-                            valueRange = -12f..12f,
-                            steps = 23 // (12 - (-12)) / 1 step = 24 steps, so 23 intermediate points
-                        )
+                        Screen.SequencerView -> {
+                            SequencerView(viewModel = viewModel)
+                        }
+                        Screen.ChopBlockView,
+                        Screen.SampleEditView,
+                        Screen.LibraryView,
+                        Screen.ProjectView -> {
+                            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                Text("${currentScreen.title} - Coming Soon!", style = MaterialTheme.typography.h5)
+                            }
+                        }
                     }
-                },
-                confirmButton = {
-                    Button(onClick = { showPadEditDialog.value = false }) { Text("Done") }
-                }
-            )
-        }
-
-        // Pattern, Kit, and Tempo Controls Section
-        Column(modifier = Modifier.padding(horizontal = 8.dp)) {
-            // Active Kit Display
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text("Active Kit: $activeKitName", style = MaterialTheme.typography.subtitle1, modifier = Modifier.weight(1f))
-                val showSaveKitDialog = rememberSaveable { mutableStateOf(false) }
-                val newKitName = rememberSaveable { mutableStateOf("") }
-                Button(onClick = { showSaveKitDialog.value = true }, content = { Text("Save Kit") })
-
-                if (showSaveKitDialog.value) {
-                    AlertDialog(
-                        onDismissRequest = { showSaveKitDialog.value = false },
-                        title = { Text("Save Drum Kit") },
-                        text = {
-                            TextField(
-                                value = newKitName.value,
-                                onValueChange = { newKitName.value = it },
-                                label = { Text("Kit Name") },
-                                singleLine = true
-                            )
-                        },
-                        confirmButton = {
-                            Button(
-                                onClick = {
-                                    viewModel.saveCurrentAssignmentsAsKit(newKitName.value.ifBlank { "Untitled Kit" })
-                                    showSaveKitDialog.value = false
-                                },
-                                content = { Text("Save") }
-                            )
-                        },
-                        dismissButton = {
-                            Button(
-                                onClick = { showSaveKitDialog.value = false },
-                                content = { Text("Cancel") }
-                            )
-                        }
-                    )
-                }
-            }
-            // Kit Selection Row
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(bottom = 2.dp),
-                horizontalArrangement = Arrangement.Start,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                TextButton(
-                    onClick = {
-                        activeKitId?.let { akid ->
-                            val currentIndex = kits.indexOfFirst { it.id == akid }
-                            if (currentIndex > 0) viewModel.selectKit(kits[currentIndex - 1].id)
-                        }
-                    },
-                    enabled = kits.indexOfFirst { it.id == activeKitId } > 0,
-                    content = { Text("< Kit") }
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                TextButton(
-                    onClick = {
-                        activeKitId?.let { akid ->
-                            val currentIndex = kits.indexOfFirst { it.id == akid }
-                            if (currentIndex < kits.size - 1) viewModel.selectKit(kits[currentIndex + 1].id)
-                        }
-                    },
-                    enabled = kits.indexOfFirst { it.id == activeKitId } < kits.size - 1 && kits.isNotEmpty(),
-                    content = { Text("Kit >") }
-                )
-            }
-
-
-            // Pattern Controls Row (existing)
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text("Pattern: ${currentPattern?.name ?: "N/A"}", style = MaterialTheme.typography.h6, modifier = Modifier.weight(1f))
-            }
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceAround, // Adjusted for more buttons
-                verticalAlignment = Alignment.CenterVertically
-            ){
-                // Previous Pattern Button
-                TextButton(
-                    onClick = {
-                        currentPattern?.let { cp ->
-                            val currentIndex = allPatterns.indexOfFirst { it.id == cp.id }
-                            if (currentIndex > 0) viewModel.selectPattern(allPatterns[currentIndex - 1].id)
-                        }
-                    },
-                    enabled = (allPatterns.indexOfFirst { it.id == currentPattern?.id } > 0),
-                    content = { Text("< Prev") }
-                )
-
-                // Rename Button
-                Button(
-                    onClick = {
-                        currentPattern?.let {
-                            renameText.value = it.name
-                            showRenameDialog.value = true
-                        }
-                    },
-                    enabled = currentPattern != null,
-                    content = { Text("Rename") }
-                )
-
-                // New Pattern Button
-                TextButton(
-                    onClick = { viewModel.createNewPattern() },
-                    content = { Text("New") }
-                )
-
-                // Clear Pattern Button
-                Button(
-                    onClick = {
-                        if (currentPattern != null) showClearPatternDialog.value = true
-                    },
-                    enabled = currentPattern != null,
-                    content = { Text("Clear") }
-                )
-
-
-                // Delete Button
-                Button(
-                    onClick = {
-                        if (currentPattern != null) showDeleteDialog.value = true
-                    },
-                    enabled = currentPattern != null,
-                    content = { Text("Delete") }
-                )
-
-                // Next Pattern Button
-                TextButton(
-                    onClick = {
-                        currentPattern?.let { cp ->
-                            val currentIndex = allPatterns.indexOfFirst { it.id == cp.id }
-                            if (currentIndex < allPatterns.size - 1) viewModel.selectPattern(allPatterns[currentIndex + 1].id)
-                        }
-                    },
-                    enabled = (allPatterns.indexOfFirst { it.id == currentPattern?.id } < allPatterns.size - 1 && allPatterns.isNotEmpty()),
-                    content = { Text("Next >") }
-                )
-            }
-
-            // Rename Dialog
-            if (showRenameDialog.value) {
-                AlertDialog(
-                    onDismissRequest = { showRenameDialog.value = false },
-                    title = { Text("Rename Pattern") },
-                    text = { TextField(value = renameText.value, onValueChange = { renameText.value = it }, singleLine = true) },
-                    confirmButton = {
-                        Button(
-                            onClick = { currentPattern?.let { viewModel.renamePattern(it.id, renameText.value) }; showRenameDialog.value = false },
-                            content = { Text("Rename") }
-                        )
-                    },
-                    dismissButton = {
-                        Button(
-                            onClick = { showRenameDialog.value = false },
-                            content = { Text("Cancel") }
-                        )
-                    }
-                )
-            }
-
-            // Delete Confirmation Dialog
-            if (showDeleteDialog.value) {
-                AlertDialog(
-                    onDismissRequest = { showDeleteDialog.value = false },
-                    title = { Text("Confirm Delete") },
-                    text = { Text("Are you sure you want to delete '${currentPattern?.name}'?") },
-                    confirmButton = {
-                        Button(
-                            onClick = { currentPattern?.let { viewModel.deletePattern(it.id) }; showDeleteDialog.value = false },
-                            content = { Text("Delete") }
-                        )
-                    },
-                    dismissButton = {
-                        Button(
-                            onClick = { showDeleteDialog.value = false },
-                            content = { Text("Cancel") }
-                        )
-                    }
-                )
-            }
-
-            // Clear Pattern Confirmation Dialog
-            if (showClearPatternDialog.value) {
-                AlertDialog(
-                    onDismissRequest = { showClearPatternDialog.value = false },
-                    title = { Text("Confirm Clear Pattern") },
-                    text = { Text("Are you sure you want to clear all notes in '${currentPattern?.name ?: "this pattern"}'?") },
-                    confirmButton = {
-                        Button(
-                            onClick = { viewModel.clearCurrentPattern(); showClearPatternDialog.value = false },
-                            content = { Text("Clear") }
-                        )
-                    },
-                    dismissButton = {
-                        Button(
-                            onClick = { showClearPatternDialog.value = false },
-                            content = { Text("Cancel") }
-                        )
-                    }
-                )
-            }
-
-
-             // 16 Levels Controls Row
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp, horizontal = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceAround
-            ) {
-                Button(onClick = { viewModel.toggle16LevelsMode() }) {
-                    Text(if (is16LevelsModeActive) "Exit 16 Levels" else "16 Levels")
-                }
-                Button(
-                    onClick = { viewModel.startSelectingLevelsSourcePad() },
-                    enabled = is16LevelsModeActive && canSetSourcePad,
-                    colors = ButtonDefaults.buttonColors(
-                        backgroundColor = if (isSelectingLevelsSourcePad) Color.Yellow
-                                        else MaterialTheme.colors.secondary
-                    )
-                ) {
-                    Text(
-                        if (isSelectingLevelsSourcePad) "Tap Pad..."
-                        else if (is16LevelsModeActive && !canSetSourcePad) "No Samples"
-                        else "Set Source"
-                    )
-                }
-                val sourcePadInfo = levelsSourcePadId?.let { srcId ->
-                    pads.find { it.id == srcId }?.let {
-                        "Src: ${it.sampleId?.take(4) ?: "P${it.id}"}"
-                    } ?: "Src: P$srcId"
-                } ?: "Src: None"
-                Text(sourcePadInfo, style = MaterialTheme.typography.body2)
-            }
-
-
-            // Metronome Controls Row (existing)
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 8.dp)) {
-                    Switch(
-                        checked = isMetronomeEnabled,
-                        onCheckedChange = { viewModel.toggleMetronome() }
-                    )
-                    Text("Metronome", style = MaterialTheme.typography.body2, modifier = Modifier.padding(start = 4.dp, end = 8.dp))
-                }
-                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f).padding(end=8.dp)) {
-                     Slider(
-                        value = metronomeVolume,
-                        onValueChange = { viewModel.setMetronomeVolume(it) },
-                        valueRange = 0f..1f,
-                        modifier = Modifier.weight(1f)
-                    )
-                    Text(
-                        text = "${(metronomeVolume * 100).toInt()}%",
-                        style = MaterialTheme.typography.caption,
-                        modifier = Modifier.width(40.dp).padding(start = 4.dp)
-                    )
-                }
-            }
-        }
-
-
-        // Transport Controls Row (existing)
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(8.dp)
-                .height(60.dp) // Adjusted height
-                .background(Color.DarkGray),
-            horizontalArrangement = Arrangement.SpaceEvenly, // Keeps original spacing for main controls
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Button(onClick = { viewModel.startPlayback() }, enabled = !isPlaying) { Text("Play") }
-            Button(onClick = { viewModel.stopPlayback() }, enabled = isPlaying) { Text("Stop") }
-            Button(
-                onClick = { viewModel.toggleRecording() },
-                colors = androidx.compose.material.ButtonDefaults.buttonColors(
-                    backgroundColor = if (isRecording) Color.Red else MaterialTheme.colors.secondary
-                )
-            ) { Text("Record") }
-            Text("Step: ${currentStep + 1}", color = Color.White, style = MaterialTheme.typography.body1)
-        }
-    }
+                } // End of main Column inside Scaffold's content
+            } // End of Scaffold's content lambda
+        ) // End of Scaffold
+    } // End of ModalNavigationDrawer
 }
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -716,6 +563,14 @@ fun DefaultPreview() {
         private val _uiEvents_preview = MutableSharedFlow<String>()
         override val uiEvents = _uiEvents_preview.asSharedFlow() // Hides
 
+        // --- Navigation State for Preview (overriding base) ---
+        private val _currentScreen_preview = MutableStateFlow(Screen.DrumPadView)
+        override val currentScreen: StateFlow<Screen> = _currentScreen_preview.asStateFlow()
+
+        override fun navigateTo(screen: Screen) {
+            _currentScreen_preview.value = screen
+        }
+        // --- End Navigation State for Preview ---
 
         override fun toggle16LevelsMode() { _is16LevelsModeActive_preview.value = !_is16LevelsModeActive_preview.value }
         override fun startSelectingLevelsSourcePad() { _isSelectingLevelsSourcePad_preview.value = true }
@@ -758,7 +613,9 @@ fun DefaultPreview() {
             is16LevelsModeActive = previewViewModel.is16LevelsModeActive.collectAsState().value,
             levelsSourcePadId = previewViewModel.levelsSourcePadId.collectAsState().value,
             isSelectingLevelsSourcePad = previewViewModel.isSelectingLevelsSourcePad.collectAsState().value,
-            canSetSourcePad = previewViewModel.canSetSourcePad.collectAsState().value // Pass for preview
+            canSetSourcePad = previewViewModel.canSetSourcePad.collectAsState().value, // Pass for preview
+            currentScreen = previewViewModel.currentScreen.collectAsState().value, // Pass for preview
+            onNavigateTo = { screen -> previewViewModel.navigateTo(screen) } // Pass for preview
         )
     }
 }
